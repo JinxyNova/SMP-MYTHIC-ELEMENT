@@ -43,6 +43,12 @@ public class SpellProgress {
         return level;
     }
 
+    /** Nombre d'utilisations minimum pour atteindre (au moins) le niveau donné, borné entre 1 et MAX_LEVEL. */
+    public static int usesRequiredForLevel(int level) {
+        int clamped = Math.max(1, Math.min(MAX_LEVEL, level));
+        return USES_FOR_LEVEL[clamped - 1];
+    }
+
     public int getUsesForNextLevel() {
         int level = getLevel();
         if (level >= MAX_LEVEL) return -1;

@@ -89,14 +89,14 @@ public final class MythicSMP extends JavaPlugin {
         SpellWheelManager spellWheelManager = new SpellWheelManager(this, elementManager, spellManager);
         pluginManager.registerEvents(new SpellWheelListener(this, spellManager, spellWheelManager), this);
         pluginManager.registerEvents(new SpellRuneListener(this, itemRegistry, elementManager, spellWheelManager), this);
-        getCommand("mythicspells").setExecutor(new MythicSpellsCommand(elementManager, spellWheelManager));
+        getCommand("mythicspells").setExecutor(new MythicSpellsCommand(elementManager, spellManager, spellWheelManager));
 
         this.ultimateMageManager = new UltimateMageManager(this);
         UltimateSpellMenuManager ultimateSpellMenuManager = new UltimateSpellMenuManager(this, ultimateMageManager);
         pluginManager.registerEvents(new UltimateMageGemListener(this, elementManager, ultimateMageManager), this);
         pluginManager.registerEvents(new UltimateSpellMenuListener(this, ultimateMageManager, ultimateSpellMenuManager), this);
         getCommand("mythicultimate").setExecutor(new MythicUltimateCommand(ultimateMageManager, ultimateSpellMenuManager));
-        getCommand("mythicadminspell").setExecutor(new MythicAdminSpellCommand());
+        getCommand("mythicadminspell").setExecutor(new MythicAdminSpellCommand(spellManager, elementManager));
 
         pluginManager.registerEvents(new SpearListener(this, itemRegistry), this);
         pluginManager.registerEvents(new WeaponEffectListener(this), this);

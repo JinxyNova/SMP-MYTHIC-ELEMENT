@@ -1,149 +1,243 @@
 package com.merci.mythicsmp.commands;
 
-import com.merci.mythicsmp.ultimate.UltimateVisuals;
+import com.merci.mythicsmp.elements.Element;
+import com.merci.mythicsmp.elements.ElementManager;
+import com.merci.mythicsmp.spells.Spell;
+import com.merci.mythicsmp.spells.SpellManager;
+import com.merci.mythicsmp.spells.SpellProgress;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
-import org.bukkit.Color;
-import org.bukkit.Location;
-import org.bukkit.Particle;
-import org.bukkit.Sound;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
- * Sort réservé aux administrateurs (permission mythicsmp.adminspell, OP par
- * défaut) : contrairement aux autres sorts, il n'existe ni objet ni classe
- * pour l'obtenir — la commande elle-même EST le sort, on ne peut donc y
- * accéder que via cette commande admin.
+ * Commande admin pour tout ce qui touche au déblocage/à la progression des
+ * sorts et des éléments : débloquer un sort précis, forcer un niveau de
+ * maîtrise (skip de niveaux) ou tout mettre au niveau maximum d'un coup.
  *
- * "Destruction Absolue" tue instantanément (setHealth(0), pas de simple
- * dégât qui pourrait être absorbé par une résistance ou une Totem of
- * Undying) toutes les entités vivantes dans un large rayon autour du
- * lanceur, lui excepté.
- *
- * Mise en scène en 3 actes, à la hauteur du sort le plus destructeur du
- * plugin : une charge sombre et oppressante (colonne d'âmes, grondement du
- * Wither qui enfle), une onde de choc qui balaie tout le rayon, puis un
- * faisceau vertical qui s'abat sur chaque cible condamnée avant
- * l'implosion finale.
+ * Réservée aux admins : le sender doit être OP ou avoir la permission
+ * "mythicsmp.admin" (un plugin de permissions peut donner ce noeud à un
+ * groupe modérateur sans avoir à donner le OP complet).
  */
 public class MythicAdminSpellCommand implements CommandExecutor {
 
-    private static final double RADIUS = 40.0;
+    private static final String PERMISSION = "mythicsmp.admin";
+
+    private final SpellManager spellManager;
+    private final ElementManager elementManager;
+
+    public MythicAdminSpellCommand(SpellManager spellManager, ElementManager elementManager) {
+        this.spellManager = spellManager;
+        this.elementManager = elementManager;
+    }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage("Commande réservée aux joueurs.");
+        if (!sender.isOp() && !sender.hasPermission(PERMISSION)) {
+            sender.sendMessage(Component.text("Tu n'as pas la permission d'utiliser cette commande.", NamedTextColor.RED));
             return true;
         }
 
-        Plugin plugin = Bukkit.getPluginManager().getPlugin("MythicSMP");
-        if (plugin == null) {
-            sender.sendMessage("Erreur interne : plugin introuvable.");
+        if (args.length == 0) {
+            sendHelp(sender, label);
             return true;
         }
 
-        // On fige les cibles dès l'instant du cast (pas au moment de l'implosion,
-        // plus tard) pour ne pas punir quelqu'un qui vient d'entrer dans le rayon
-        // pendant la charge du sort.
-        List<LivingEntity> targets = new ArrayList<>();
-        for (Entity nearby : player.getNearbyEntities(RADIUS, RADIUS, RADIUS)) {
-            if (nearby instanceof LivingEntity target && !target.equals(player)) {
-                targets.add(target);
-            }
+        switch (args[0].toLowerCase()) {
+            case "unlock" -> handleUnlock(sender, label, args);
+            case "setlevel" -> handleSetLevel(sender, label, args);
+            case "max" -> handleMax(sender, label, args);
+            case "maxall" -> handleMaxAll(sender, label, args);
+            case "list" -> handleList(sender, args);
+            default -> sendHelp(sender, label);
         }
-
-        castDestructionAbsolue(plugin, player, targets);
         return true;
     }
 
-    private void castDestructionAbsolue(Plugin plugin, Player player, List<LivingEntity> targets) {
-        Location origin = player.getLocation();
-        Particle.DustOptions voidColor = UltimateVisuals.dust(Color.fromRGB(20, 0, 25), 1.6f);
-        Particle.DustOptions bloodColor = UltimateVisuals.dust(Color.fromRGB(120, 0, 10), 1.3f);
+    // ---------------------------------------------------------------- unlock
 
-        // Acte 1 : charge oppressante — colonne d'âmes qui monte et tourne pendant 30
-        // ticks (1.5s), grondement du Wither qui enfle en volume et en aigu.
-        player.getWorld().playSound(origin, Sound.ENTITY_WITHER_AMBIENT, 1f, 0.4f);
-        player.getWorld().playSound(origin, Sound.BLOCK_BEACON_ACTIVATE, 0.6f, 0.3f);
+    private void handleUnlock(CommandSender sender, String label, String[] args) {
+        if (args.length < 3) {
+            sender.sendMessage(Component.text("Usage : /" + label + " unlock <joueur> <sortId|all|élément>", NamedTextColor.RED));
+            return;
+        }
+        Player target = resolvePlayer(sender, args[1]);
+        if (target == null) return;
 
-        new BukkitRunnable() {
-            int tick = 0;
-            final int duration = 30;
+        String selector = args[2];
+        if (selector.equalsIgnoreCase("all")) {
+            int count = spellManager.unlockAll(target.getUniqueId(), null);
+            sender.sendMessage(Component.text(count + " sort(s) débloqué(s) pour " + target.getName() + " (tous éléments).", NamedTextColor.GREEN));
+            target.sendMessage(Component.text("Un admin a débloqué tous tes sorts !", NamedTextColor.LIGHT_PURPLE));
+            return;
+        }
 
-            @Override
-            public void run() {
-                if (tick >= duration) {
-                    cancel();
-                    unleash(plugin, player, origin, targets, voidColor, bloodColor);
-                    return;
-                }
-                Location base = player.getLocation();
-                double progress = tick / (double) duration;
-                double height = progress * 3.0;
-                double radius = 1.4 * (1.0 - 0.4 * progress);
-                double angle = tick * 0.9;
-                for (int i = 0; i < 6; i++) {
-                    double a = angle + (2 * Math.PI / 6) * i;
-                    double x = base.getX() + radius * Math.cos(a);
-                    double z = base.getZ() + radius * Math.sin(a);
-                    base.getWorld().spawnParticle(Particle.SOUL, x, base.getY() + height, z, 1, 0, 0, 0, 0);
-                    base.getWorld().spawnParticle(Particle.DUST, x, base.getY() + height, z, 1, 0, 0, 0, 0, voidColor);
-                }
-                if (tick % 4 == 0) {
-                    base.getWorld().playSound(base, Sound.ENTITY_WITHER_HURT, 0.4f, 0.3f + (float) progress);
-                }
-                tick += 2;
-            }
-        }.runTaskTimer(plugin, 0L, 1L);
+        Element element = parseElement(selector);
+        if (element != null) {
+            int count = spellManager.unlockAll(target.getUniqueId(), element);
+            sender.sendMessage(Component.text(count + " sort(s) " + element.getLabel() + " débloqué(s) pour " + target.getName() + ".", NamedTextColor.GREEN));
+            target.sendMessage(Component.text("Un admin a débloqué tes sorts " + element.getLabel() + " !", NamedTextColor.LIGHT_PURPLE));
+            return;
+        }
+
+        Spell spell = spellManager.getRegistry().get(selector);
+        if (spell == null) {
+            sender.sendMessage(Component.text("Sort, élément ou 'all' inconnu : " + selector
+                    + " (utilise /" + label + " list pour voir les ids).", NamedTextColor.RED));
+            return;
+        }
+        boolean unlocked = spellManager.unlock(target.getUniqueId(), spell.id());
+        if (unlocked) {
+            sender.sendMessage(Component.text("Sort '" + spell.name() + "' débloqué pour " + target.getName() + ".", NamedTextColor.GREEN));
+            target.sendMessage(Component.text("Un admin t'a débloqué le sort : " + spell.name(), NamedTextColor.LIGHT_PURPLE));
+        } else {
+            sender.sendMessage(Component.text(target.getName() + " avait déjà ce sort débloqué.", NamedTextColor.YELLOW));
+        }
     }
 
-    private void unleash(Plugin plugin, Player player, Location origin, List<LivingEntity> targets,
-                          Particle.DustOptions voidColor, Particle.DustOptions bloodColor) {
-        // Acte 2 : rugissement + onde de choc sombre qui balaie tout le rayon du sort,
-        // visuellement, avant que les cibles ne tombent.
-        player.getWorld().playSound(origin, Sound.ENTITY_ENDER_DRAGON_GROWL, 2f, 0.4f);
-        player.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, origin, 6, 1.5, 1, 1.5, 0);
-        UltimateVisuals.shockwaveDust(plugin, origin, voidColor, RADIUS, 6, 2);
+    // ------------------------------------------------------------- setlevel
 
-        // Acte 3, à retardement (12 ticks, le temps que l'onde de choc "arrive") : un
-        // faisceau vertical de particules s'abat sur chaque cible condamnée juste avant
-        // qu'elle ne tombe, façon jugement divin inversé.
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                int killed = 0;
-                for (LivingEntity target : targets) {
-                    if (target.isDead()) continue;
-                    Location loc = target.getLocation();
-                    for (double y = 0; y < 6; y += 0.4) {
-                        loc.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, loc.clone().add(0, y, 0), 1, 0, 0, 0, 0);
-                    }
-                    loc.getWorld().spawnParticle(Particle.DUST, loc.clone().add(0, 1, 0), 20, 0.4, 0.8, 0.4, 0, bloodColor);
-                    loc.getWorld().playSound(loc, Sound.ENTITY_WITHER_HURT, 1f, 0.6f);
-                    target.setHealth(0.0);
-                    killed++;
-                }
+    private void handleSetLevel(CommandSender sender, String label, String[] args) {
+        if (args.length < 4) {
+            sender.sendMessage(Component.text("Usage : /" + label + " setlevel <joueur> <sortId|all|élément> <niveau 1-"
+                    + SpellProgress.MAX_LEVEL + ">", NamedTextColor.RED));
+            return;
+        }
+        Player target = resolvePlayer(sender, args[1]);
+        if (target == null) return;
 
-                // Acte final : implosion silencieuse et brutale sur le lanceur, la marque
-                // visuelle du pouvoir qu'il vient d'exercer.
-                player.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, origin, 14, RADIUS / 5, 2, RADIUS / 5, 0);
-                player.getWorld().spawnParticle(Particle.SOUL, origin, 60, 3, 2, 3, 0.05);
-                player.getWorld().playSound(origin, Sound.ENTITY_WITHER_DEATH, 2f, 0.5f);
-                player.sendMessage(Component.text(
-                        "Destruction Absolue : " + killed + " entité(s) anéantie(s).", NamedTextColor.DARK_RED));
+        int level;
+        try {
+            level = Integer.parseInt(args[3]);
+        } catch (NumberFormatException e) {
+            sender.sendMessage(Component.text("Niveau invalide : " + args[3], NamedTextColor.RED));
+            return;
+        }
+
+        String selector = args[2];
+        if (selector.equalsIgnoreCase("all")) {
+            for (Spell spell : spellManager.getRegistry().all()) {
+                spellManager.setLevel(target.getUniqueId(), spell.id(), level);
             }
-        }.runTaskLater(plugin, 12L);
+            sender.sendMessage(Component.text("Tous les sorts de " + target.getName() + " sont maintenant niveau " + level + ".", NamedTextColor.GREEN));
+            return;
+        }
+
+        Element element = parseElement(selector);
+        if (element != null) {
+            for (Spell spell : spellManager.getRegistry().forElement(element)) {
+                spellManager.setLevel(target.getUniqueId(), spell.id(), level);
+            }
+            sender.sendMessage(Component.text("Sorts " + element.getLabel() + " de " + target.getName() + " au niveau " + level + ".", NamedTextColor.GREEN));
+            return;
+        }
+
+        boolean ok = spellManager.setLevel(target.getUniqueId(), selector, level);
+        if (!ok) {
+            sender.sendMessage(Component.text("Sort, élément ou 'all' inconnu : " + selector, NamedTextColor.RED));
+            return;
+        }
+        sender.sendMessage(Component.text("Niveau de '" + selector + "' fixé à " + level + " pour " + target.getName() + ".", NamedTextColor.GREEN));
+    }
+
+    // ------------------------------------------------------------------ max
+
+    private void handleMax(CommandSender sender, String label, String[] args) {
+        if (args.length < 3) {
+            sender.sendMessage(Component.text("Usage : /" + label + " max <joueur> <sortId|all|élément>", NamedTextColor.RED));
+            return;
+        }
+        Player target = resolvePlayer(sender, args[1]);
+        if (target == null) return;
+
+        String selector = args[2];
+        if (selector.equalsIgnoreCase("all")) {
+            spellManager.maxAll(target.getUniqueId(), null);
+            sender.sendMessage(Component.text("Tous les sorts de " + target.getName() + " sont maintenant au niveau max.", NamedTextColor.GREEN));
+            return;
+        }
+        Element element = parseElement(selector);
+        if (element != null) {
+            spellManager.maxAll(target.getUniqueId(), element);
+            sender.sendMessage(Component.text("Sorts " + element.getLabel() + " de " + target.getName() + " au niveau max.", NamedTextColor.GREEN));
+            return;
+        }
+        boolean ok = spellManager.setLevel(target.getUniqueId(), selector, SpellProgress.MAX_LEVEL);
+        if (!ok) {
+            sender.sendMessage(Component.text("Sort, élément ou 'all' inconnu : " + selector, NamedTextColor.RED));
+            return;
+        }
+        sender.sendMessage(Component.text("'" + selector + "' au niveau max pour " + target.getName() + ".", NamedTextColor.GREEN));
+    }
+
+    // --------------------------------------------------------------- maxall
+
+    private void handleMaxAll(CommandSender sender, String label, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage : /" + label + " maxall <joueur>", NamedTextColor.RED));
+            return;
+        }
+        Player target = resolvePlayer(sender, args[1]);
+        if (target == null) return;
+
+        elementManager.adminUnlockAllElements(target.getUniqueId());
+        spellManager.maxAll(target.getUniqueId(), null);
+
+        sender.sendMessage(Component.text(target.getName()
+                + " est maintenant au niveau maximum : 4 éléments + les 64 sorts au niveau "
+                + SpellProgress.MAX_LEVEL + ".", NamedTextColor.GOLD));
+        target.sendMessage(Component.text("Un admin t'a mis au niveau maximum : tous les éléments et tous les sorts, niveau max !",
+                NamedTextColor.GOLD));
+    }
+
+    // ----------------------------------------------------------------- list
+
+    private void handleList(CommandSender sender, String[] args) {
+        Element filterElement = args.length >= 2 ? parseElement(args[1]) : null;
+        sender.sendMessage(Component.text("=== Sorts disponibles ===", NamedTextColor.GOLD));
+        for (Element element : Element.values()) {
+            if (filterElement != null && element != filterElement) continue;
+            sender.sendMessage(Component.text("• " + element.getLabel(), element.getColor()));
+            for (Spell spell : spellManager.getRegistry().forElement(element)) {
+                sender.sendMessage(Component.text("   - " + spell.id() + "  (" + spell.tier().getLabel() + ") " + spell.name(),
+                        NamedTextColor.GRAY));
+            }
+        }
+    }
+
+    // --------------------------------------------------------------- utils
+
+    private Player resolvePlayer(CommandSender sender, String name) {
+        Player target = Bukkit.getPlayerExact(name);
+        if (target == null) {
+            sender.sendMessage(Component.text("Joueur introuvable ou hors ligne : " + name, NamedTextColor.RED));
+        }
+        return target;
+    }
+
+    private Element parseElement(String text) {
+        try {
+            return Element.valueOf(text.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private void sendHelp(CommandSender sender, String label) {
+        sender.sendMessage(Component.text("=== Commandes admin sorts (" + label + ") ===", NamedTextColor.GOLD));
+        sender.sendMessage(Component.text("/" + label + " unlock <joueur> <sortId|all|élément>", NamedTextColor.YELLOW)
+                .append(Component.text("  — débloque un/des sort(s)", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/" + label + " setlevel <joueur> <sortId|all|élément> <niveau 1-"
+                + SpellProgress.MAX_LEVEL + ">", NamedTextColor.YELLOW)
+                .append(Component.text("  — force un niveau (skip)", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/" + label + " max <joueur> <sortId|all|élément>", NamedTextColor.YELLOW)
+                .append(Component.text("  — met au niveau maximum", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/" + label + " maxall <joueur>", NamedTextColor.YELLOW)
+                .append(Component.text("  — 4 éléments + tous les sorts au niveau max", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/" + label + " list [élément]", NamedTextColor.YELLOW)
+                .append(Component.text("  — liste les ids de sorts", NamedTextColor.GRAY)));
     }
 }

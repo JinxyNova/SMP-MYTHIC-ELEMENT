@@ -89,6 +89,19 @@ public class ElementManager {
         return RANK_LABELS[Math.min(count, RANK_LABELS.length) - 1];
     }
 
+    // ------------------------------------------------------ OUTILS ADMIN
+
+    /**
+     * Force le déblocage de tous les éléments pour un joueur, sans passer
+     * par la règle du premier élément choisi ni par la limite de
+     * MAX_ELEMENTS. Réservé aux commandes admin (ex: mise au niveau max).
+     */
+    public void adminUnlockAllElements(UUID player) {
+        LinkedHashSet<Element> owned = elements.computeIfAbsent(player, k -> new LinkedHashSet<>());
+        owned.addAll(List.of(Element.values()));
+        save();
+    }
+
     private void load() {
         if (!file.exists()) return;
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);

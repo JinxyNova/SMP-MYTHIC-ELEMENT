@@ -1,86 +1,50 @@
 name: MythicSMP
 version: '1.0.0'
 main: com.merci.mythicsmp.MythicSMP
-api-version: '1.21'
+api-version: '1.20'
 author: Merci
-description: Armes et objets uniques et mythiques pour serveur SMP
+
+description: Plugin de SMP avec éléments, sorts, objets mythiques, économie, métiers, boss et quêtes.
 
 commands:
-  mythicgive:
-    description: Donne un objet mythique à un joueur
-    usage: /mythicgive <joueur> <id> [quantité]
-    permission: mythicsmp.give
-  mythiclist:
-    description: Liste tous les objets mythiques disponibles
-    usage: /mythiclist
-    permission: mythicsmp.list
-  mythicboss:
-    description: Invoque le Gardien Écarlate à ta position
-    usage: /mythicboss
-    permission: mythicsmp.boss
-  mythicauction:
-    description: Ouvre le marché entre joueurs
-    usage: /mythicauction
-    permission: mythicsmp.auction
-  mythicsell:
-    description: Met en vente l'objet tenu en main
-    usage: /mythicsell <prix>
-    permission: mythicsmp.auction
-  mythicbalance:
-    description: Affiche ton solde de pièces
-    usage: /mythicbalance
-    permission: mythicsmp.auction
-  mythicquests:
-    description: Affiche les quêtes du jour et ta progression
-    usage: /mythicquests
-    permission: mythicsmp.quests
-  mythicjob:
-    description: Choisis ou consulte ton métier
-    usage: /mythicjob info | /mythicjob choose <métier>
-    permission: mythicsmp.jobs
-  mythicjobtop:
-    description: Classement des métiers
-    usage: /mythicjobtop
-    permission: mythicsmp.jobs
   mythicelement:
-    description: Consulte ou choisis ta classe élémentaire
-    usage: /mythicelement | /mythicelement choose
-    permission: mythicsmp.elements
+    description: Choisir/consulter tes éléments (et sous-commandes admin).
+    usage: /<command> [admin unlock|max <joueur> <élément|all>]
   mythicspells:
-    description: Ouvre la roue des sorts
-    usage: /mythicspells
-    permission: mythicsmp.spells
-  mythicbaltop:
-    description: Classement des plus grosses fortunes
-    usage: /mythicbaltop
-    permission: mythicsmp.auction
-  mythicultimate:
-    description: Ouvre les sorts de la classe Ultime Mage
-    usage: /mythicultimate
-    permission: mythicsmp.ultimate
+    description: Ouvrir la roue des sorts ou consulter le grimoire des sorts.
+    usage: /<command> [liste [élément]]
   mythicadminspell:
-    description: Sort admin qui anéantit instantanément tout ce qui est proche
-    usage: /mythicadminspell
-    permission: mythicsmp.adminspell
+    description: "[Admin] Débloquer/monter de niveau les sorts d'un joueur."
+    usage: /<command> <unlock|setlevel|max|maxall|list> ...
+    permission: mythicsmp.admin
+  mythicultimate:
+    description: Ouvrir le menu des sorts ultimes (Mage Ultime).
+  mythicgive:
+    description: "[Admin] Donner un objet mythique à un joueur."
+    usage: /<command> <joueur> <itemId> [quantité]
+    permission: mythicsmp.admin
+  mythiclist:
+    description: Lister tous les objets/armes mythiques du serveur.
+    usage: /<command> [rareté]
+  mythicboss:
+    description: "[Admin] Faire apparaître un boss."
+    permission: mythicsmp.admin
+  mythicauction:
+    description: Ouvrir l'hôtel des ventes.
+  mythicsell:
+    description: Mettre un objet en vente à l'hôtel des ventes.
+  mythicbalance:
+    description: Consulter ton solde.
+  mythicjob:
+    description: Choisir/consulter ton métier.
+  mythicjobtop:
+    description: Classement des métiers.
+  mythicbaltop:
+    description: Classement des soldes.
+  mythicquests:
+    description: Consulter tes quêtes en cours.
 
 permissions:
-  mythicsmp.give:
-    default: op
-  mythicsmp.list:
-    default: true
-  mythicsmp.boss:
-    default: op
-  mythicsmp.auction:
-    default: true
-  mythicsmp.quests:
-    default: true
-  mythicsmp.jobs:
-    default: true
-  mythicsmp.elements:
-    default: true
-  mythicsmp.spells:
-    default: true
-  mythicsmp.ultimate:
-    default: true
-  mythicsmp.adminspell:
+  mythicsmp.admin:
+    description: Accès aux commandes admin de MythicSMP (déblocage/niveau max/give).
     default: op

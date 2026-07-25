@@ -99,6 +99,53 @@ public class SpellManager {
         SUCCESS, SUCCESS_LEVEL_UP, NOT_UNLOCKED, ON_COOLDOWN, UNKNOWN
     }
 
+    // ------------------------------------------------------ OUTILS ADMIN
+
+    /**
+     * Débloque tous les sorts d'un élément donné (ou tous les sorts du jeu
+     * si element == null) pour un joueur, sans toucher à leur progression
+     * s'ils étaient déjà débloqués. Utilisé par les commandes admin.
+     *
+     * @return le nombre de sorts nouvellement débloqués.
+     */
+    public int unlockAll(UUID player, Element element) {
+        int count = 0;
+        for (Spell spell : registry.all()) {
+            if (element != null && spell.element() != element) continue;
+            if (unlock(player, spell.id())) count++;
+        }
+        return count;
+    }
+
+    /**
+     * Force le niveau de maîtrise d'un sort déjà (ou pas encore) débloqué
+     * pour un joueur. Débloque le sort si besoin. Le niveau est borné entre
+     * 1 et SpellProgress.MAX_LEVEL.
+     *
+     * @return false si le sort n'existe pas dans le registre.
+     */
+    public boolean setLevel(UUID player, String spellId, int level) {
+        Spell spell = registry.get(spellId);
+        if (spell == null) return false;
+
+        int clamped = Math.max(1, Math.min(SpellProgress.MAX_LEVEL, level));
+        Map<String, SpellProgress> playerSpells = unlocked.computeIfAbsent(player, k -> new LinkedHashMap<>());
+        playerSpells.put(spellId, new SpellProgress(SpellProgress.usesRequiredForLevel(clamped)));
+        save();
+        return true;
+    }
+
+    /**
+     * Débloque et met à niveau maximal (mastery) tous les sorts d'un
+     * élément donné (ou tous les sorts du jeu si element == null).
+     */
+    public void maxAll(UUID player, Element element) {
+        for (Spell spell : registry.all()) {
+            if (element != null && spell.element() != element) continue;
+            setLevel(player, spell.id(), SpellProgress.MAX_LEVEL);
+        }
+    }
+
     private void load() {
         if (!file.exists()) return;
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
