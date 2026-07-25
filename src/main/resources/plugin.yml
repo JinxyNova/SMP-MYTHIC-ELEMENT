@@ -1,50 +1,90 @@
 name: MythicSMP
 version: '1.0.0'
 main: com.merci.mythicsmp.MythicSMP
-api-version: '1.20'
+api-version: '1.21'
 author: Merci
-
-description: Plugin de SMP avec éléments, sorts, objets mythiques, économie, métiers, boss et quêtes.
+description: Armes et objets uniques et mythiques pour serveur SMP
 
 commands:
-  mythicelement:
-    description: Choisir/consulter tes éléments (et sous-commandes admin).
-    usage: /<command> [admin unlock|max <joueur> <élément|all>]
-  mythicspells:
-    description: Ouvrir la roue des sorts ou consulter le grimoire des sorts.
-    usage: /<command> [liste [élément]]
-  mythicadminspell:
-    description: "[Admin] Débloquer/monter de niveau les sorts d'un joueur."
-    usage: /<command> <unlock|setlevel|max|maxall|list> ...
-    permission: mythicsmp.admin
-  mythicultimate:
-    description: Ouvrir le menu des sorts ultimes (Mage Ultime).
   mythicgive:
-    description: "[Admin] Donner un objet mythique à un joueur."
-    usage: /<command> <joueur> <itemId> [quantité]
-    permission: mythicsmp.admin
+    description: Donne un objet mythique à un joueur
+    usage: /mythicgive <joueur> <id> [quantité]
+    permission: mythicsmp.give
   mythiclist:
-    description: Lister tous les objets/armes mythiques du serveur.
-    usage: /<command> [rareté]
+    description: Liste tous les objets mythiques disponibles, groupés par rareté
+    usage: /mythiclist [rareté]
+    permission: mythicsmp.list
   mythicboss:
-    description: "[Admin] Faire apparaître un boss."
-    permission: mythicsmp.admin
+    description: Invoque le Gardien Écarlate à ta position
+    usage: /mythicboss
+    permission: mythicsmp.boss
   mythicauction:
-    description: Ouvrir l'hôtel des ventes.
+    description: Ouvre le marché entre joueurs
+    usage: /mythicauction
+    permission: mythicsmp.auction
   mythicsell:
-    description: Mettre un objet en vente à l'hôtel des ventes.
+    description: Met en vente l'objet tenu en main
+    usage: /mythicsell <prix>
+    permission: mythicsmp.auction
   mythicbalance:
-    description: Consulter ton solde.
-  mythicjob:
-    description: Choisir/consulter ton métier.
-  mythicjobtop:
-    description: Classement des métiers.
-  mythicbaltop:
-    description: Classement des soldes.
+    description: Affiche ton solde de pièces
+    usage: /mythicbalance
+    permission: mythicsmp.auction
   mythicquests:
-    description: Consulter tes quêtes en cours.
+    description: Affiche les quêtes du jour et ta progression
+    usage: /mythicquests
+    permission: mythicsmp.quests
+  mythicjob:
+    description: Choisis ou consulte ton métier
+    usage: /mythicjob info | /mythicjob choose <métier>
+    permission: mythicsmp.jobs
+  mythicjobtop:
+    description: Classement des métiers
+    usage: /mythicjobtop
+    permission: mythicsmp.jobs
+  mythicelement:
+    description: Consulte ou choisis ta classe élémentaire
+    usage: /mythicelement [info] | /mythicelement choose | /mythicelement admin unlock|max <joueur> [élément|all]
+    permission: mythicsmp.elements
+  mythicspells:
+    description: Ouvre la roue des sorts, consulte le grimoire, ou gère les sorts en admin
+    usage: /mythicspells | /mythicspells liste [élément] | /mythicspells admin unlock|max <joueur> [sort|all]
+    permission: mythicsmp.spells
+  mythicbaltop:
+    description: Classement des plus grosses fortunes
+    usage: /mythicbaltop
+    permission: mythicsmp.auction
+  mythicultimate:
+    description: Ouvre les sorts de la classe Ultime Mage
+    usage: /mythicultimate
+    permission: mythicsmp.ultimate
+  mythicadminspell:
+    description: Sort admin qui anéantit instantanément tout ce qui est proche
+    usage: /mythicadminspell
+    permission: mythicsmp.adminspell
 
 permissions:
-  mythicsmp.admin:
-    description: Accès aux commandes admin de MythicSMP (déblocage/niveau max/give).
+  mythicsmp.give:
+    default: op
+  mythicsmp.list:
+    default: true
+  mythicsmp.boss:
+    default: op
+  mythicsmp.auction:
+    default: true
+  mythicsmp.quests:
+    default: true
+  mythicsmp.jobs:
+    default: true
+  mythicsmp.elements:
+    default: true
+  mythicsmp.elements.admin:
+    default: op
+  mythicsmp.spells:
+    default: true
+  mythicsmp.spells.admin:
+    default: op
+  mythicsmp.ultimate:
+    default: true
+  mythicsmp.adminspell:
     default: op

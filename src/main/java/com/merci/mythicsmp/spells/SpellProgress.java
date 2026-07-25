@@ -43,12 +43,6 @@ public class SpellProgress {
         return level;
     }
 
-    /** Nombre d'utilisations minimum pour atteindre (au moins) le niveau donné, borné entre 1 et MAX_LEVEL. */
-    public static int usesRequiredForLevel(int level) {
-        int clamped = Math.max(1, Math.min(MAX_LEVEL, level));
-        return USES_FOR_LEVEL[clamped - 1];
-    }
-
     public int getUsesForNextLevel() {
         int level = getLevel();
         if (level >= MAX_LEVEL) return -1;
@@ -63,5 +57,10 @@ public class SpellProgress {
     /** -8% de recharge par niveau de maîtrise au-delà du niveau 1. */
     public double getCooldownMultiplier() {
         return 1.0 - (getLevel() - 1) * 0.08;
+    }
+
+    /** Admin : passe directement ce sort à son niveau de maîtrise maximum. */
+    public void maxOut() {
+        this.uses = USES_FOR_LEVEL[USES_FOR_LEVEL.length - 1];
     }
 }

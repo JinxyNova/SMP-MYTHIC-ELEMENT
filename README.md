@@ -118,11 +118,22 @@ Pour ajouter une recette de tier plus tard : un `ForgeRecipe` de plus dans `Forg
 
 ## Commandes
 
+### Pour tout le monde
+
 - `/mythicgive <joueur> <id> [quantité]` — donne un objet (permission `mythicsmp.give`, OP par défaut)
-- `/mythiclist` — liste tous les ids disponibles (accessible à tous)
+- `/mythiclist [rareté]` — liste tous les objets/armes mythiques groupés par rareté (Commun → Mythique), avec id + description/stats extraits directement du lore de l'objet. Rareté optionnelle pour filtrer (ex : `/mythiclist légendaire`)
+- `/mythicspells` — ouvre la roue des sorts de ton premier élément (comme avant)
+- `/mythicspells liste [élément]` — le grimoire complet : les 64 sorts avec tier, puissance (`x1.0` à `x4.0`), recharge de base, description, et rappel de la Rune qui débloque chacun. Si tu es joueur, affiche aussi ton statut (débloqué/verrouillé, niveau de maîtrise)
+- `/mythicelement` ou `/mythicelement info` — ton profil élémentaire (éléments possédés, grade)
+- `/mythicelement choose` — choisit ta classe de départ (une seule fois)
 - `/mythicboss` — invoque Le Gardien Écarlate (permission `mythicsmp.boss`, OP par défaut)
 - `/mythicsell <prix>`, `/mythicauction`, `/mythicbalance` — voir la section Marché Mythique plus bas
 - `/mythicquests` — voir la section Quêtes Journalières plus bas
+
+### Admin
+
+- `/mythicelement admin unlock|max <joueur> [élément|all]` — débloque un élément précis (ou les 4 d'un coup avec `all`/sans argument) pour n'importe quel joueur en ligne, sans passer par la Gemme au Pouvoir Infini (permission `mythicsmp.elements.admin`, OP par défaut)
+- `/mythicspells admin unlock|max <joueur> [sort|all]` — débloque (`unlock`) ou débloque + maximise la maîtrise (`max`) d'un sort précis par son id (ex : `feu_ultra_1`), de tous les sorts d'un élément (ex : `feu`), ou des 64 sorts d'un coup avec `all`/sans argument (permission `mythicsmp.spells.admin`, OP par défaut)
 
 ## Comment fusionner une gemme avec une épée
 

@@ -82,24 +82,43 @@ public class ElementManager {
         return true;
     }
 
+    /**
+     * Admin : force le déblocage d'un élément précis, en ignorant les règles
+     * normales (pas besoin d'avoir déjà choisi de classe de départ, pas de
+     * limite au nombre maximum d'éléments). Utilisé par
+     * /mythicelement admin unlock|max.
+     *
+     * @return true si l'élément vient d'être ajouté (faux s'il était déjà possédé).
+     */
+    public boolean adminUnlock(UUID player, Element element) {
+        LinkedHashSet<Element> owned = elements.computeIfAbsent(player, k -> new LinkedHashSet<>());
+        boolean added = owned.add(element);
+        if (added) save();
+        return added;
+    }
+
+    /**
+     * Admin : débloque directement les 4 éléments pour ce joueur (équivalent
+     * du "niveau max" côté éléments, puisqu'il n'y a pas de palier par
+     * élément — juste le nombre d'éléments possédés).
+     *
+     * @return le nombre d'éléments nouvellement ajoutés.
+     */
+    public int adminUnlockAll(UUID player) {
+        LinkedHashSet<Element> owned = elements.computeIfAbsent(player, k -> new LinkedHashSet<>());
+        int added = 0;
+        for (Element element : Element.values()) {
+            if (owned.add(element)) added++;
+        }
+        if (added > 0) save();
+        return added;
+    }
+
     /** Titre/grade correspondant au nombre d'éléments maîtrisés (null si aucun élément). */
     public String getRankLabel(UUID player) {
         int count = getElements(player).size();
         if (count == 0) return null;
         return RANK_LABELS[Math.min(count, RANK_LABELS.length) - 1];
-    }
-
-    // ------------------------------------------------------ OUTILS ADMIN
-
-    /**
-     * Force le déblocage de tous les éléments pour un joueur, sans passer
-     * par la règle du premier élément choisi ni par la limite de
-     * MAX_ELEMENTS. Réservé aux commandes admin (ex: mise au niveau max).
-     */
-    public void adminUnlockAllElements(UUID player) {
-        LinkedHashSet<Element> owned = elements.computeIfAbsent(player, k -> new LinkedHashSet<>());
-        owned.addAll(List.of(Element.values()));
-        save();
     }
 
     private void load() {

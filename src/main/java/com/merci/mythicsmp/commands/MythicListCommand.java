@@ -5,28 +5,29 @@ import com.merci.mythicsmp.items.ItemRegistry;
 import com.merci.mythicsmp.items.MythicItem;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * Commande publique listant tous les objets mythiques (armes et objets
- * spéciaux) du serveur, groupés par rareté, avec leur id et leur lore
- * (qui contient les infos de puissance : dégâts, effets, etc.). Ouverte à
- * tout le monde pour servir de wiki des objets.
+ * /mythiclist [rareté] — liste tous les objets/armes mythiques, groupés par
+ * rareté (Commun -> Mythique), avec id + description/stats (extraits du
+ * lore réel de l'objet, donc toujours à jour même si un item change son
+ * lore). Un argument de rareté optionnel filtre l'affichage à une seule
+ * rareté (ex : /mythiclist légendaire).
  */
 public class MythicListCommand implements CommandExecutor {
 
-    private final ItemRegistry itemRegistry;
+    private final ItemRegistry registry;
 
-    public MythicListCommand(ItemRegistry itemRegistry) {
-        this.itemRegistry = itemRegistry;
+    public MythicListCommand(ItemRegistry registry) {
+        this.registry = registry;
     }
 
     @Override
@@ -35,67 +36,63 @@ public class MythicListCommand implements CommandExecutor {
         if (args.length >= 1) {
             filter = parseRarity(args[0]);
             if (filter == null) {
-                sender.sendMessage(Component.text("Rareté inconnue : " + args[0]
-                        + " (commun, rare, epique, legendaire, mythique).", NamedTextColor.RED));
+                sender.sendMessage(Component.text(
+                        "Rareté inconnue : " + args[0] + " (commun, rare, épique, légendaire, mythique)",
+                        NamedTextColor.RED));
                 return true;
             }
         }
 
-        sender.sendMessage(Component.text("=== Objets & Armes de MythicSMP ===", NamedTextColor.GOLD));
+        sender.sendMessage(Component.text(
+                "=== Objets mythiques" + (filter != null ? " — " + filter.getLabel() : "") + " ===",
+                NamedTextColor.GOLD));
 
-        List<MythicItem> items = new ArrayList<>(itemRegistry.all().values());
-        items.sort(Comparator.comparing((MythicItem item) -> item.getRarity().ordinal())
-                .thenComparing(MythicItem::getId));
+        for (ItemRarity rarity : ItemRarity.values()) {
+            if (filter != null && rarity != filter) continue;
 
-        ItemRarity currentSection = null;
-        for (MythicItem item : items) {
-            if (filter != null && item.getRarity() != filter) continue;
-            if (item.getRarity() != currentSection) {
-                currentSection = item.getRarity();
-                sender.sendMessage(Component.text(" "));
-                sender.sendMessage(Component.text("★ " + currentSection.getLabel(), currentSection.getColor()));
-            }
-            sender.sendMessage(Component.text("  • " + displayName(item) + "  (id: " + item.getId() + ")", NamedTextColor.GRAY));
-            for (String loreLine : loreLines(item)) {
-                sender.sendMessage(Component.text("      " + loreLine, NamedTextColor.DARK_GRAY));
+            List<MythicItem> items = registry.all().values().stream()
+                    .filter(item -> item.getRarity() == rarity)
+                    .toList();
+            if (items.isEmpty()) continue;
+
+            sender.sendMessage(Component.text("--- " + rarity.getLabel() + " ---", rarity.getColor()));
+            for (MythicItem item : items) {
+                ItemStack stack = item.build();
+                ItemMeta meta = stack.getItemMeta();
+
+                String displayName = meta != null && meta.displayName() != null
+                        ? PlainTextComponentSerializer.plainText().serialize(meta.displayName())
+                        : item.getId();
+
+                sender.sendMessage(Component.text("- " + item.getId() + " ", NamedTextColor.GRAY)
+                        .append(Component.text(displayName, rarity.getColor())));
+
+                if (meta != null && meta.hasLore() && meta.lore() != null) {
+                    for (Component loreLine : meta.lore()) {
+                        String plain = PlainTextComponentSerializer.plainText().serialize(loreLine);
+                        // On saute les lignes vides et le footer "★ Rareté" (déjà affiché par le groupe).
+                        if (plain.isBlank() || plain.startsWith("★")) continue;
+                        sender.sendMessage(Component.text("    " + plain, NamedTextColor.DARK_GRAY));
+                    }
+                }
             }
         }
         return true;
     }
 
-    private String displayName(MythicItem item) {
-        ItemStack stack = item.build();
-        ItemMeta meta = stack.getItemMeta();
-        if (meta != null && meta.displayName() != null) {
-            return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                    .serialize(meta.displayName());
+    private ItemRarity parseRarity(String input) {
+        String normalized = stripAccents(input.toLowerCase(Locale.ROOT));
+        for (ItemRarity rarity : ItemRarity.values()) {
+            if (rarity.name().toLowerCase(Locale.ROOT).equals(normalized)) return rarity;
+            if (stripAccents(rarity.getLabel().toLowerCase(Locale.ROOT)).equals(normalized)) return rarity;
         }
-        return item.getId();
+        return null;
     }
 
-    private List<String> loreLines(MythicItem item) {
-        List<String> lines = new ArrayList<>();
-        ItemStack stack = item.build();
-        ItemMeta meta = stack.getItemMeta();
-        if (meta == null || meta.lore() == null) return lines;
-        var serializer = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
-        for (Component component : meta.lore()) {
-            String text = serializer.serialize(component).trim();
-            if (!text.isEmpty() && !text.startsWith("★")) {
-                lines.add(text);
-            }
-        }
-        return lines;
-    }
-
-    private ItemRarity parseRarity(String text) {
-        try {
-            return ItemRarity.valueOf(text.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            for (ItemRarity rarity : ItemRarity.values()) {
-                if (rarity.getLabel().equalsIgnoreCase(text)) return rarity;
-            }
-            return null;
-        }
+    private String stripAccents(String input) {
+        return input
+                .replace("é", "e").replace("è", "e").replace("ê", "e")
+                .replace("à", "a")
+                .replace("ï", "i");
     }
 }
