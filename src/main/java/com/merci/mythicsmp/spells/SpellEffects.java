@@ -166,6 +166,13 @@ public final class SpellEffects {
         }.runTaskTimer(plugin, 0L, periodTicks);
     }
 
+    /** Version sonorisée de areaOverTime (joue un son de déclenchement une fois au lancement). */
+    public static void areaOverTime(Plugin plugin, Player caster, Location center, double radius,
+                                     double damagePerTick, int durationTicks, int periodTicks, Particle particle, Sound sound) {
+        center.getWorld().playSound(center, sound, 1.3f, 1f);
+        areaOverTime(plugin, caster, center, radius, damagePerTick, durationTicks, periodTicks, particle);
+    }
+
     /** Invoque un allié temporaire pour le joueur (sorts ultra-forts d'invocation). */
     public static void summonAlly(Plugin plugin, Player caster, EntityType type, int durationTicks) {
         Entity entity = caster.getWorld().spawnEntity(caster.getLocation(), type);
@@ -176,6 +183,194 @@ public final class SpellEffects {
                     if (!ally.isDead()) ally.remove();
                 }
             }.runTaskLater(plugin, durationTicks);
+        }
+    }
+
+    // ============================================================
+    //  NOUVEAU KIT VISUEL/SONORE "PROPRE" — projectiles qui voyagent
+    //  réellement dans les airs, particules qui suivent le joueur,
+    //  impacts sonorisés et en couches. Utilisé par feu/eau/terre/vent.
+    //  (Les méthodes ci-dessus restent inchangées pour ne rien casser
+    //  ailleurs, ex : UltimateSpell.)
+    // ============================================================
+
+    /**
+     * Un vrai projectile visuel qui avance tick par tick devant le joueur,
+     * avec une particule "coeur" + une particule de traînée, s'arrête sur
+     * un bloc solide ou sur la première entité touchée, joue un son de
+     * lancer puis un son d'impact, et peut infliger des dégâts en zone
+     * autour du point d'impact (explosionRadius = 0 pour un impact simple).
+     */
+    public static void launchProjectile(Plugin plugin, Player caster, double range, double speed,
+                                         double hitRadius, double damage, double explosionRadius,
+                                         Particle coreParticle, Particle trailParticle,
+                                         Sound launchSound, Sound impactSound) {
+        Location eye = caster.getEyeLocation();
+        Vector direction = eye.getDirection().normalize();
+        caster.getWorld().playSound(eye, launchSound, 1.3f, 1.15f);
+
+        new BukkitRunnable() {
+            final Location point = eye.clone().add(direction.clone().multiply(0.8));
+            double travelled = 0.8;
+            int tick = 0;
+
+            @Override
+            public void run() {
+                if (!caster.isOnline() || travelled >= range) {
+                    cancel();
+                    return;
+                }
+
+                if (point.getBlock().getType().isSolid()) {
+                    impactBurst(point, coreParticle, trailParticle, impactSound, damage, explosionRadius, caster, null);
+                    cancel();
+                    return;
+                }
+
+                for (Entity nearby : point.getWorld().getNearbyEntities(point, hitRadius, hitRadius, hitRadius)) {
+                    if (nearby instanceof LivingEntity target && !target.equals(caster)) {
+                        impactBurst(point, coreParticle, trailParticle, impactSound, damage, explosionRadius, caster, target);
+                        cancel();
+                        return;
+                    }
+                }
+
+                // Coeur du projectile + halo qui tourne légèrement autour pour un rendu "boule" plutôt qu'un point plat
+                point.getWorld().spawnParticle(coreParticle, point, 3, 0.06, 0.06, 0.06, 0.01);
+                double swirl = tick * 0.9;
+                point.getWorld().spawnParticle(trailParticle, point.clone().add(Math.cos(swirl) * 0.18, Math.sin(swirl) * 0.18, 0), 1, 0, 0, 0, 0);
+                point.getWorld().spawnParticle(trailParticle, point.clone().add(-Math.cos(swirl) * 0.18, -Math.sin(swirl) * 0.18, 0), 1, 0, 0, 0, 0);
+
+                point.add(direction.clone().multiply(speed));
+                travelled += speed;
+                tick++;
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+    }
+
+    /** Impact soigné d'un projectile : gerbe de particules en 2 couches, son, dégâts directs + éclaboussure optionnelle. */
+    private static void impactBurst(Location point, Particle core, Particle trail, Sound sound,
+                                     double damage, double explosionRadius, Player caster, LivingEntity directHit) {
+        point.getWorld().spawnParticle(core, point, 35, 0.35, 0.35, 0.35, 0.06);
+        point.getWorld().spawnParticle(trail, point, 20, 0.5, 0.5, 0.5, 0.02);
+        point.getWorld().playSound(point, sound, 1.3f, 1f);
+
+        if (directHit != null) {
+            directHit.damage(damage, caster);
+        }
+        if (explosionRadius > 0) {
+            for (Entity nearby : point.getWorld().getNearbyEntities(point, explosionRadius, explosionRadius, explosionRadius)) {
+                if (nearby instanceof LivingEntity target && !target.equals(caster) && !target.equals(directHit)) {
+                    target.damage(damage * 0.6, caster);
+                }
+            }
+        }
+    }
+
+    /** Anneau de particules posé au sol, utile pour annoncer une zone d'effet avant/pendant un sort. */
+    public static void groundRing(Location center, Particle particle, double radius, int points) {
+        for (int i = 0; i < points; i++) {
+            double angle = 2 * Math.PI * i / points;
+            double x = Math.cos(angle) * radius;
+            double z = Math.sin(angle) * radius;
+            center.getWorld().spawnParticle(particle, center.clone().add(x, 0.1, z), 1, 0, 0, 0, 0);
+        }
+    }
+
+    /** Spirale montante de particules autour d'un point, pour un cast/transformation qui en jette. */
+    public static void risingSpiral(Location origin, Particle particle, double height, double radius, int turns) {
+        int steps = Math.max(10, turns * 24);
+        for (int i = 0; i <= steps; i++) {
+            double t = (double) i / steps;
+            double angle = t * turns * 2 * Math.PI;
+            double y = t * height;
+            double x = Math.cos(angle) * radius;
+            double z = Math.sin(angle) * radius;
+            origin.getWorld().spawnParticle(particle, origin.clone().add(x, y, z), 1, 0, 0, 0, 0);
+        }
+    }
+
+    /**
+     * Aura de particules qui SUIT le joueur en temps réel pendant toute la
+     * durée de l'effet (buffs, avatars, dashs...) : deux anneaux tournants
+     * à hauteur différente, recalculés sur la position live du joueur.
+     */
+    public static void followingAura(Plugin plugin, Player target, Particle particle, int durationTicks,
+                                      double radius, int pointsPerRing) {
+        new BukkitRunnable() {
+            int elapsed = 0;
+            double angle = 0;
+
+            @Override
+            public void run() {
+                if (elapsed >= durationTicks || !target.isOnline()) {
+                    cancel();
+                    return;
+                }
+                Location base = target.getLocation();
+                Location lowRing = base.clone().add(0, 0.15, 0);
+                Location highRing = base.clone().add(0, 1.9, 0);
+
+                for (int i = 0; i < pointsPerRing; i++) {
+                    double a = angle + (2 * Math.PI / pointsPerRing) * i;
+                    double x = Math.cos(a) * radius;
+                    double z = Math.sin(a) * radius;
+                    lowRing.getWorld().spawnParticle(particle, lowRing.clone().add(x, 0, z), 1, 0, 0, 0, 0);
+                    highRing.getWorld().spawnParticle(particle, highRing.clone().add(-x, 0, -z), 1, 0, 0, 0, 0);
+                }
+                angle += 0.4;
+                elapsed += 2;
+            }
+        }.runTaskTimer(plugin, 0L, 2L);
+    }
+
+    /** Traînée qui suit le joueur pendant un court sprint/dash. */
+    public static void dashTrail(Plugin plugin, Player caster, Particle particle, int durationTicks) {
+        new BukkitRunnable() {
+            int elapsed = 0;
+
+            @Override
+            public void run() {
+                if (elapsed >= durationTicks || !caster.isOnline()) {
+                    cancel();
+                    return;
+                }
+                caster.getWorld().spawnParticle(particle, caster.getLocation().add(0, 1, 0), 6, 0.25, 0.35, 0.25, 0.02);
+                elapsed++;
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+    }
+
+    /** Version sonorisée + en couches de damageKnockbackAoe, avec anneau au sol pour bien lire la zone touchée. */
+    public static void damageKnockbackAoe(Player caster, double radius, double damage, double knockback,
+                                           Particle particle, Particle accent, Sound sound) {
+        Location origin = caster.getLocation().add(0, 1, 0);
+        caster.getWorld().spawnParticle(particle, origin, 70, radius / 2, 0.6, radius / 2, 0.03);
+        caster.getWorld().spawnParticle(accent, origin, 30, radius / 2, 0.8, radius / 2, 0.01);
+        groundRing(caster.getLocation(), accent, radius, 28);
+        caster.getWorld().playSound(origin, sound, 1.3f, 1f);
+        for (Entity nearby : caster.getNearbyEntities(radius, radius, radius)) {
+            if (nearby instanceof LivingEntity target && !target.equals(caster)) {
+                target.damage(damage, caster);
+                Vector push = target.getLocation().toVector().subtract(caster.getLocation().toVector())
+                        .normalize().multiply(knockback).setY(0.35);
+                target.setVelocity(push);
+            }
+        }
+    }
+
+    /** Version sonorisée de pullAoe, avec anneau au sol. */
+    public static void pullAoe(Player caster, double radius, double damage, Particle particle, Sound sound) {
+        Location origin = caster.getLocation();
+        caster.getWorld().spawnParticle(particle, origin.clone().add(0, 1, 0), 60, radius / 2, 0.6, radius / 2, 0.02);
+        groundRing(origin, particle, radius, 24);
+        caster.getWorld().playSound(origin, sound, 1.2f, 1f);
+        for (Entity nearby : caster.getNearbyEntities(radius, radius, radius)) {
+            if (nearby instanceof LivingEntity target && !target.equals(caster)) {
+                Vector pull = origin.toVector().subtract(target.getLocation().toVector()).normalize().multiply(0.6).setY(0.2);
+                target.setVelocity(pull);
+                if (damage > 0) target.damage(damage, caster);
+            }
         }
     }
 }
