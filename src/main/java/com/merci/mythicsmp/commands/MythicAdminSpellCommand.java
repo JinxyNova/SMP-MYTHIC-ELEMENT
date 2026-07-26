@@ -39,7 +39,7 @@ import java.util.List;
  */
 public class MythicAdminSpellCommand implements CommandExecutor {
 
-    private static final double RADIUS = 40.0;
+    private static final double RADIUS = 50.0;
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {

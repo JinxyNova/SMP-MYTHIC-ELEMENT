@@ -49,7 +49,7 @@ public enum UltimateSpell {
 
                 new BukkitRunnable() {
                     int tick = 0;
-                    final int duration = 25;
+                    final int duration = 34;
 
                     @Override
                     public void run() {
@@ -64,15 +64,23 @@ public enum UltimateSpell {
                         }
                         Location base = caster.getLocation();
                         double progress = tick / (double) duration;
-                        double height = progress * 2.4;
+                        double height = progress * 3.2;
                         double angle = tick * 0.8;
-                        double radius = 1.6 * (1.0 - 0.3 * progress);
+                        double radius = 2.1 * (1.0 - 0.3 * progress);
                         Particle[] elements = {Particle.FLAME, Particle.SPLASH, Particle.BLOCK_CRUMBLE, Particle.CLOUD};
                         for (int i = 0; i < elements.length; i++) {
                             double a = angle + (2 * Math.PI / elements.length) * i;
                             double x = base.getX() + radius * Math.cos(a);
                             double z = base.getZ() + radius * Math.sin(a);
-                            base.getWorld().spawnParticle(elements[i], x, base.getY() + height, z, 1, 0, 0, 0, 0);
+                            // BLOCK_CRUMBLE a besoin d'une BlockData, sinon le serveur lève une
+                            // exception qui annule la tâche entière (et donc l'explosion finale
+                            // ne se déclenchait jamais) : c'était le bug qui cassait ce sort.
+                            if (elements[i] == Particle.BLOCK_CRUMBLE) {
+                                base.getWorld().spawnParticle(elements[i], x, base.getY() + height, z, 1,
+                                        org.bukkit.Material.STONE.createBlockData());
+                            } else {
+                                base.getWorld().spawnParticle(elements[i], x, base.getY() + height, z, 1, 0, 0, 0, 0);
+                            }
                         }
                         if (tick % 4 == 0) {
                             base.getWorld().playSound(base, Sound.BLOCK_BEACON_AMBIENT, 0.6f, 0.7f + (float) progress);
@@ -96,7 +104,7 @@ public enum UltimateSpell {
                 // explose en un mélange des 4 éléments là où il touche.
                 new BukkitRunnable() {
                     int tick = 0;
-                    final int duration = 18;
+                    final int duration = 24;
 
                     @Override
                     public void run() {
@@ -109,9 +117,9 @@ public enum UltimateSpell {
                             unleashJugement(caster);
                             return;
                         }
-                        Location focus = SpellEffects.forwardPoint(caster, 1.4);
+                        Location focus = SpellEffects.forwardPoint(caster, 1.8);
                         double progress = tick / (double) duration;
-                        double radius = 0.5 * (1.0 - progress) + 0.05;
+                        double radius = 0.7 * (1.0 - progress) + 0.05;
                         for (int i = 0; i < 6; i++) {
                             double angle = tick * 1.1 + (2 * Math.PI / 6) * i;
                             double x = focus.getX() + radius * Math.cos(angle);
@@ -142,7 +150,7 @@ public enum UltimateSpell {
 
                 new BukkitRunnable() {
                     int tick = 0;
-                    final int duration = 24;
+                    final int duration = 32;
 
                     @Override
                     public void run() {
@@ -157,7 +165,7 @@ public enum UltimateSpell {
                         }
                         Location base = caster.getLocation().add(0, 2.2, 0);
                         double progress = tick / (double) duration;
-                        double radius = 2.5 * (1.0 - progress) + 0.3;
+                        double radius = 3.3 * (1.0 - progress) + 0.3;
                         double angle = tick * 1.3;
                         for (int arm = 0; arm < 4; arm++) {
                             double a = angle + (2 * Math.PI / 4) * arm;
@@ -193,7 +201,7 @@ public enum UltimateSpell {
 
                 new BukkitRunnable() {
                     int tick = 0;
-                    final int duration = 20;
+                    final int duration = 27;
 
                     @Override
                     public void run() {
@@ -208,8 +216,8 @@ public enum UltimateSpell {
                         }
                         Location base = caster.getLocation();
                         double progress = tick / (double) duration;
-                        double radius = 4.0 * (1.0 - progress) + 0.4;
-                        double height = 1.6 * progress;
+                        double radius = 5.2 * (1.0 - progress) + 0.4;
+                        double height = 2.1 * progress;
                         double angle = -tick * 0.9;
                         for (int i = 0; i < colors.length; i++) {
                             double a = angle + (2 * Math.PI / colors.length) * i;
@@ -237,7 +245,7 @@ public enum UltimateSpell {
 
                 new BukkitRunnable() {
                     int tick = 0;
-                    final int duration = 12;
+                    final int duration = 16;
 
                     @Override
                     public void run() {
@@ -252,8 +260,8 @@ public enum UltimateSpell {
                         }
                         Location base = caster.getLocation();
                         double progress = tick / (double) duration;
-                        double height = progress * 1.8;
-                        double radius = 0.7;
+                        double height = progress * 2.4;
+                        double radius = 0.9;
                         double angle = tick * 0.9;
                         for (int i = 0; i < 5; i++) {
                             double a = angle + (2 * Math.PI / 5) * i;
@@ -323,78 +331,84 @@ public enum UltimateSpell {
 
     private static void unleashCataclysme(Plugin plugin, Player caster) {
         Location origin = caster.getLocation().add(0, 1, 0);
-        caster.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, origin, 3, 1, 0.5, 1, 0);
-        caster.getWorld().spawnParticle(Particle.FLAME, origin, 70, 2, 1, 2, 0.06);
-        caster.getWorld().spawnParticle(Particle.SPLASH, origin, 70, 2, 1, 2, 0.06);
-        caster.getWorld().spawnParticle(Particle.BLOCK_CRUMBLE, origin, 70, 2, 1, 2, 0.06);
-        caster.getWorld().spawnParticle(Particle.CLOUD, origin, 70, 2, 1, 2, 0.06);
+        caster.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, origin, 4, 1.3, 0.7, 1.3, 0);
+        caster.getWorld().spawnParticle(Particle.FLAME, origin, 95, 2.6, 1.3, 2.6, 0.08);
+        caster.getWorld().spawnParticle(Particle.SPLASH, origin, 95, 2.6, 1.3, 2.6, 0.08);
+        // BLOCK_CRUMBLE a besoin d'une BlockData, sinon l'appel lève une exception qui
+        // annule cette méthode (dégâts compris) : c'était le bug qui empêchait le
+        // Cataclysme d'infliger ses dégâts et son onde de choc.
+        caster.getWorld().spawnParticle(Particle.BLOCK_CRUMBLE, origin, 95, 2.6, 1.3, 2.6, 0.08, org.bukkit.Material.STONE.createBlockData());
+        caster.getWorld().spawnParticle(Particle.CLOUD, origin, 95, 2.6, 1.3, 2.6, 0.08);
         caster.getWorld().playSound(origin, Sound.ENTITY_WITHER_DEATH, 1.3f, 0.8f);
         caster.getWorld().playSound(origin, Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 0.7f);
-        // 3 anneaux qui s'étendent en séquence, façon onde de choc à retardement.
-        UltimateVisuals.shockwave(plugin, origin, Particle.EXPLOSION, 8.0, 3, 3);
-        SpellEffects.damageKnockbackAoe(caster, 8.0, 110.0, 2.0, Particle.EXPLOSION);
+        // 4 anneaux qui s'étendent en séquence, plus loin et plus longtemps qu'avant.
+        UltimateVisuals.shockwave(plugin, origin, Particle.EXPLOSION, 10.5, 4, 3);
+        SpellEffects.damageKnockbackAoe(caster, 10.5, 110.0, 2.3, Particle.EXPLOSION);
     }
 
     private static void unleashJugement(Player caster) {
         caster.getWorld().playSound(caster.getLocation(), Sound.ITEM_TRIDENT_THUNDER, 1.4f, 1f);
         Location eye = caster.getEyeLocation();
-        UltimateVisuals.beamRings(eye, eye.getDirection(), 22, 0.6, Particle.END_ROD);
-        boolean hit = SpellEffects.hitscan(caster, 22, 130.0, Particle.END_ROD);
-        Location impact = SpellEffects.forwardPoint(caster, hit ? 4 : 20);
-        caster.getWorld().spawnParticle(Particle.FLAME, impact, 35, 0.6, 0.6, 0.6, 0.03);
-        caster.getWorld().spawnParticle(Particle.SPLASH, impact, 35, 0.6, 0.6, 0.6, 0.03);
-        caster.getWorld().spawnParticle(Particle.BLOCK_CRUMBLE, impact, 25, 0.6, 0.6, 0.6, 0.03);
-        caster.getWorld().spawnParticle(Particle.CLOUD, impact, 25, 0.6, 0.6, 0.6, 0.03);
-        UltimateVisuals.ring(impact, 1.8, 16, Particle.END_ROD, 0);
+        UltimateVisuals.beamRings(eye, eye.getDirection(), 29, 0.6, Particle.END_ROD);
+        boolean hit = SpellEffects.hitscan(caster, 29, 130.0, Particle.END_ROD);
+        Location impact = SpellEffects.forwardPoint(caster, hit ? 4 : 26);
+        caster.getWorld().spawnParticle(Particle.FLAME, impact, 48, 0.8, 0.8, 0.8, 0.04);
+        caster.getWorld().spawnParticle(Particle.SPLASH, impact, 48, 0.8, 0.8, 0.8, 0.04);
+        // BLOCK_CRUMBLE a besoin d'une BlockData, sinon l'appel lève une exception.
+        caster.getWorld().spawnParticle(Particle.BLOCK_CRUMBLE, impact, 32, 0.8, 0.8, 0.8, 0.04, org.bukkit.Material.STONE.createBlockData());
+        caster.getWorld().spawnParticle(Particle.CLOUD, impact, 32, 0.8, 0.8, 0.8, 0.04);
+        UltimateVisuals.ring(impact, 2.4, 20, Particle.END_ROD, 0);
         caster.getWorld().playSound(impact, Sound.ENTITY_GENERIC_EXPLODE, 1.2f, 1.1f);
     }
 
     private static void unleashTempete(Plugin plugin, Player caster) {
         Location origin = caster.getLocation().add(0, 1, 0);
         caster.getWorld().playSound(origin, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 1f);
-        SpellEffects.pullAoe(caster, 7.5, 0, Particle.CLOUD);
-        for (Entity nearby : caster.getNearbyEntities(7.5, 7.5, 7.5)) {
+        SpellEffects.pullAoe(caster, 9.8, 0, Particle.CLOUD);
+        for (Entity nearby : caster.getNearbyEntities(9.8, 9.8, 9.8)) {
             if (nearby instanceof LivingEntity target && !target.equals(caster)) {
-                target.setFireTicks(100);
-                SpellEffects.root(target, 60);
+                target.setFireTicks(130);
+                SpellEffects.root(target, 80);
             }
         }
         // Écrasement différé d'une demi-seconde, le temps que la traction fasse effet,
-        // avec deux ondes de choc alternées feu/glace.
+        // avec deux ondes de choc alternées feu/glace, puis une vraie vague qui part du
+        // joueur et s'étend progressivement (au lieu d'un simple nuage figé sur place).
         new BukkitRunnable() {
             @Override
             public void run() {
                 if (!caster.isOnline()) return;
                 Location center = caster.getLocation().add(0, 1, 0);
-                UltimateVisuals.shockwave(plugin, center, Particle.FLAME, 7.5, 2, 2);
-                UltimateVisuals.shockwave(plugin, center, Particle.SNOWFLAKE, 7.5, 2, 2);
-                SpellEffects.damageKnockbackAoe(caster, 7.5, 95.0, 1.4, Particle.SNOWFLAKE);
+                UltimateVisuals.shockwave(plugin, center, Particle.FLAME, 9.8, 3, 2);
+                UltimateVisuals.shockwave(plugin, center, Particle.SNOWFLAKE, 9.8, 3, 2);
+                SpellEffects.expandingWave(plugin, caster, center, 9.8, 5, 2, 95.0, 1.6,
+                        Particle.SNOWFLAKE, Particle.CLOUD, Sound.ENTITY_GENERIC_EXPLODE);
             }
         }.runTaskLater(plugin, 10L);
     }
 
     private static void unleashConvergence(Plugin plugin, Player caster, Particle.DustOptions[] colors) {
         Location origin = caster.getLocation().add(0, 1, 0);
-        caster.getWorld().spawnParticle(Particle.END_ROD, origin, 80, 1.5, 1, 1.5, 0.08);
+        caster.getWorld().spawnParticle(Particle.END_ROD, origin, 110, 2.0, 1.3, 2.0, 0.1);
         caster.getWorld().playSound(origin, Sound.ENTITY_ILLUSIONER_CAST_SPELL, 1.4f, 1.1f);
         caster.getWorld().playSound(origin, Sound.BLOCK_BEACON_POWER_SELECT, 1f, 1f);
-        SpellEffects.damageKnockbackAoe(caster, 7.0, 105.0, 1.6, Particle.CLOUD);
+        SpellEffects.damageKnockbackAoe(caster, 9.2, 105.0, 1.8, Particle.CLOUD);
         // Les 4 anneaux élémentaires repartent vers l'extérieur, en sens inverse de la charge.
         for (Particle.DustOptions color : colors) {
-            UltimateVisuals.shockwaveDust(plugin, origin, color, 6.0, 3, 2);
+            UltimateVisuals.shockwaveDust(plugin, origin, color, 7.9, 4, 2);
         }
-        SpellEffects.buff(caster, PotionEffectType.STRENGTH, 2, 200);
-        SpellEffects.buff(caster, PotionEffectType.SPEED, 1, 200);
-        SpellEffects.buff(caster, PotionEffectType.RESISTANCE, 1, 200);
-        SpellEffects.buff(caster, PotionEffectType.FIRE_RESISTANCE, 0, 200);
+        SpellEffects.buff(caster, PotionEffectType.STRENGTH, 2, 260);
+        SpellEffects.buff(caster, PotionEffectType.SPEED, 1, 260);
+        SpellEffects.buff(caster, PotionEffectType.RESISTANCE, 1, 260);
+        SpellEffects.buff(caster, PotionEffectType.FIRE_RESISTANCE, 0, 260);
     }
 
     private static void unleashSoin(Plugin plugin, Player caster, Particle.DustOptions gold) {
         Location origin = caster.getLocation().add(0, 1.2, 0);
-        caster.getWorld().spawnParticle(Particle.HEART, origin, 30, 0.6, 0.6, 0.6, 0.05);
-        caster.getWorld().spawnParticle(Particle.END_ROD, origin, 40, 0.4, 1.0, 0.4, 0.05);
+        caster.getWorld().spawnParticle(Particle.HEART, origin, 42, 0.8, 0.8, 0.8, 0.06);
+        caster.getWorld().spawnParticle(Particle.END_ROD, origin, 55, 0.55, 1.3, 0.55, 0.06);
         caster.getWorld().playSound(caster.getLocation(), Sound.ITEM_TOTEM_USE, 1f, 1.2f);
-        UltimateVisuals.shockwaveDust(plugin, caster.getLocation(), gold, 4.0, 3, 2);
+        UltimateVisuals.shockwaveDust(plugin, caster.getLocation(), gold, 5.2, 4, 2);
         SpellEffects.heal(caster, 9999.0);
         for (var effect : java.util.List.copyOf(caster.getActivePotionEffects())) {
             if (effect.getType().equals(PotionEffectType.POISON)

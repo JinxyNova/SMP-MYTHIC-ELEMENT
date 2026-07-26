@@ -1,9 +1,12 @@
 package com.merci.mythicsmp.spells;
 
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
+import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
@@ -14,6 +17,10 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Blocs de construction communs à tous les sorts, pour éviter de réécrire
@@ -29,6 +36,30 @@ import org.bukkit.util.Vector;
 public final class SpellEffects {
 
     private SpellEffects() {
+    }
+
+    /**
+     * BlockData par défaut pour les particules qui en réclament une (ex :
+     * BLOCK_CRUMBLE). Sans ça, le serveur refuse la particule et lève une
+     * exception qui annule tout le reste de la méthode en cours (dégâts
+     * compris) : c'était le bug qui empêchait plusieurs sorts de Terre (et
+     * une partie du sort de fusion Cataclysme) de se déclencher correctement.
+     */
+    private static final BlockData ROCK_DEBRIS = Material.STONE.createBlockData();
+
+    /**
+     * Remplace un appel direct à World#spawnParticle : fournit automatiquement
+     * la donnée requise pour les particules qui en ont besoin (BLOCK_CRUMBLE),
+     * et se comporte normalement pour toutes les autres. À utiliser partout où
+     * la particule vient d'un paramètre (donc potentiellement BLOCK_CRUMBLE).
+     */
+    private static void spawn(World world, Particle particle, Location loc, int count,
+                               double offsetX, double offsetY, double offsetZ, double extra) {
+        if (particle == Particle.BLOCK_CRUMBLE) {
+            world.spawnParticle(particle, loc, count, offsetX, offsetY, offsetZ, extra, ROCK_DEBRIS);
+        } else {
+            world.spawnParticle(particle, loc, count, offsetX, offsetY, offsetZ, extra);
+        }
     }
 
     public static void delayedExplodeAt(Plugin plugin, Player caster, Location origin, int delayTicks,
@@ -47,7 +78,7 @@ public final class SpellEffects {
 
     /** Comme damageAoe mais centré sur un point arbitraire (ex : devant le joueur) plutôt que sur lui. */
     public static void explodeAt(Player caster, Location origin, double radius, double damage, Particle particle, Sound sound) {
-        origin.getWorld().spawnParticle(particle, origin, 60, radius / 2, 0.4, radius / 2, 0.03);
+        spawn(origin.getWorld(), particle, origin, 85, radius / 1.6, 0.55, radius / 1.6, 0.035);
         origin.getWorld().playSound(origin, sound, 1.3f, 1f);
         for (Entity nearby : origin.getWorld().getNearbyEntities(origin, radius, radius, radius)) {
             if (nearby instanceof LivingEntity target && !target.equals(caster)) {
@@ -58,7 +89,7 @@ public final class SpellEffects {
 
     public static void damageAoe(Player caster, double radius, double damage, Particle particle, Sound sound) {
         Location origin = caster.getLocation().add(0, 1, 0);
-        caster.getWorld().spawnParticle(particle, origin, 50, radius / 2, 0.6, radius / 2, 0.02);
+        spawn(caster.getWorld(), particle, origin, 70, radius / 1.6, 0.8, radius / 1.6, 0.025);
         caster.getWorld().playSound(origin, sound, 1.2f, 1f);
         for (Entity nearby : caster.getNearbyEntities(radius, radius, radius)) {
             if (nearby instanceof LivingEntity target && !target.equals(caster)) {
@@ -69,7 +100,7 @@ public final class SpellEffects {
 
     public static void damageKnockbackAoe(Player caster, double radius, double damage, double knockback, Particle particle) {
         Location origin = caster.getLocation().add(0, 1, 0);
-        caster.getWorld().spawnParticle(particle, origin, 60, radius / 2, 0.6, radius / 2, 0.03);
+        spawn(caster.getWorld(), particle, origin, 85, radius / 1.6, 0.8, radius / 1.6, 0.035);
         for (Entity nearby : caster.getNearbyEntities(radius, radius, radius)) {
             if (nearby instanceof LivingEntity target && !target.equals(caster)) {
                 target.damage(damage, caster);
@@ -82,7 +113,7 @@ public final class SpellEffects {
 
     public static void pullAoe(Player caster, double radius, double damage, Particle particle) {
         Location origin = caster.getLocation();
-        caster.getWorld().spawnParticle(particle, origin.clone().add(0, 1, 0), 50, radius / 2, 0.6, radius / 2, 0.02);
+        spawn(caster.getWorld(), particle, origin.clone().add(0, 1, 0), 70, radius / 1.6, 0.8, radius / 1.6, 0.025);
         for (Entity nearby : caster.getNearbyEntities(radius, radius, radius)) {
             if (nearby instanceof LivingEntity target && !target.equals(caster)) {
                 Vector pull = origin.toVector().subtract(target.getLocation().toVector()).normalize().multiply(0.6).setY(0.2);
@@ -155,7 +186,7 @@ public final class SpellEffects {
                     cancel();
                     return;
                 }
-                center.getWorld().spawnParticle(particle, center.clone().add(0, 0.3, 0), 25, radius / 2, 0.3, radius / 2, 0.02);
+                spawn(center.getWorld(), particle, center.clone().add(0, 0.3, 0), 35, radius / 1.7, 0.35, radius / 1.7, 0.025);
                 for (Entity nearby : center.getWorld().getNearbyEntities(center, radius, radius, radius)) {
                     if (nearby instanceof LivingEntity target && !target.equals(caster)) {
                         target.damage(damagePerTick, caster);
@@ -236,10 +267,10 @@ public final class SpellEffects {
                 }
 
                 // Coeur du projectile + halo qui tourne légèrement autour pour un rendu "boule" plutôt qu'un point plat
-                point.getWorld().spawnParticle(coreParticle, point, 3, 0.06, 0.06, 0.06, 0.01);
+                spawn(point.getWorld(), coreParticle, point, 4, 0.08, 0.08, 0.08, 0.012);
                 double swirl = tick * 0.9;
-                point.getWorld().spawnParticle(trailParticle, point.clone().add(Math.cos(swirl) * 0.18, Math.sin(swirl) * 0.18, 0), 1, 0, 0, 0, 0);
-                point.getWorld().spawnParticle(trailParticle, point.clone().add(-Math.cos(swirl) * 0.18, -Math.sin(swirl) * 0.18, 0), 1, 0, 0, 0, 0);
+                spawn(point.getWorld(), trailParticle, point.clone().add(Math.cos(swirl) * 0.18, Math.sin(swirl) * 0.18, 0), 1, 0, 0, 0, 0);
+                spawn(point.getWorld(), trailParticle, point.clone().add(-Math.cos(swirl) * 0.18, -Math.sin(swirl) * 0.18, 0), 1, 0, 0, 0, 0);
 
                 point.add(direction.clone().multiply(speed));
                 travelled += speed;
@@ -251,8 +282,8 @@ public final class SpellEffects {
     /** Impact soigné d'un projectile : gerbe de particules en 2 couches, son, dégâts directs + éclaboussure optionnelle. */
     private static void impactBurst(Location point, Particle core, Particle trail, Sound sound,
                                      double damage, double explosionRadius, Player caster, LivingEntity directHit) {
-        point.getWorld().spawnParticle(core, point, 35, 0.35, 0.35, 0.35, 0.06);
-        point.getWorld().spawnParticle(trail, point, 20, 0.5, 0.5, 0.5, 0.02);
+        spawn(point.getWorld(), core, point, 45, 0.4, 0.4, 0.4, 0.07);
+        spawn(point.getWorld(), trail, point, 28, 0.55, 0.55, 0.55, 0.025);
         point.getWorld().playSound(point, sound, 1.3f, 1f);
 
         if (directHit != null) {
@@ -273,7 +304,7 @@ public final class SpellEffects {
             double angle = 2 * Math.PI * i / points;
             double x = Math.cos(angle) * radius;
             double z = Math.sin(angle) * radius;
-            center.getWorld().spawnParticle(particle, center.clone().add(x, 0.1, z), 1, 0, 0, 0, 0);
+            spawn(center.getWorld(), particle, center.clone().add(x, 0.1, z), 1, 0, 0, 0, 0);
         }
     }
 
@@ -286,7 +317,7 @@ public final class SpellEffects {
             double y = t * height;
             double x = Math.cos(angle) * radius;
             double z = Math.sin(angle) * radius;
-            origin.getWorld().spawnParticle(particle, origin.clone().add(x, y, z), 1, 0, 0, 0, 0);
+            spawn(origin.getWorld(), particle, origin.clone().add(x, y, z), 1, 0, 0, 0, 0);
         }
     }
 
@@ -297,6 +328,7 @@ public final class SpellEffects {
      */
     public static void followingAura(Plugin plugin, Player target, Particle particle, int durationTicks,
                                       double radius, int pointsPerRing) {
+        double biggerRadius = radius * 1.15;
         new BukkitRunnable() {
             int elapsed = 0;
             double angle = 0;
@@ -313,10 +345,10 @@ public final class SpellEffects {
 
                 for (int i = 0; i < pointsPerRing; i++) {
                     double a = angle + (2 * Math.PI / pointsPerRing) * i;
-                    double x = Math.cos(a) * radius;
-                    double z = Math.sin(a) * radius;
-                    lowRing.getWorld().spawnParticle(particle, lowRing.clone().add(x, 0, z), 1, 0, 0, 0, 0);
-                    highRing.getWorld().spawnParticle(particle, highRing.clone().add(-x, 0, -z), 1, 0, 0, 0, 0);
+                    double x = Math.cos(a) * biggerRadius;
+                    double z = Math.sin(a) * biggerRadius;
+                    spawn(lowRing.getWorld(), particle, lowRing.clone().add(x, 0, z), 1, 0, 0, 0, 0);
+                    spawn(highRing.getWorld(), particle, highRing.clone().add(-x, 0, -z), 1, 0, 0, 0, 0);
                 }
                 angle += 0.4;
                 elapsed += 2;
@@ -335,7 +367,7 @@ public final class SpellEffects {
                     cancel();
                     return;
                 }
-                caster.getWorld().spawnParticle(particle, caster.getLocation().add(0, 1, 0), 6, 0.25, 0.35, 0.25, 0.02);
+                spawn(caster.getWorld(), particle, caster.getLocation().add(0, 1, 0), 9, 0.3, 0.4, 0.3, 0.025);
                 elapsed++;
             }
         }.runTaskTimer(plugin, 0L, 1L);
@@ -345,9 +377,9 @@ public final class SpellEffects {
     public static void damageKnockbackAoe(Player caster, double radius, double damage, double knockback,
                                            Particle particle, Particle accent, Sound sound) {
         Location origin = caster.getLocation().add(0, 1, 0);
-        caster.getWorld().spawnParticle(particle, origin, 70, radius / 2, 0.6, radius / 2, 0.03);
-        caster.getWorld().spawnParticle(accent, origin, 30, radius / 2, 0.8, radius / 2, 0.01);
-        groundRing(caster.getLocation(), accent, radius, 28);
+        spawn(caster.getWorld(), particle, origin, 95, radius / 1.6, 0.8, radius / 1.6, 0.04);
+        spawn(caster.getWorld(), accent, origin, 45, radius / 1.6, 1.0, radius / 1.6, 0.015);
+        groundRing(caster.getLocation(), accent, radius, 34);
         caster.getWorld().playSound(origin, sound, 1.3f, 1f);
         for (Entity nearby : caster.getNearbyEntities(radius, radius, radius)) {
             if (nearby instanceof LivingEntity target && !target.equals(caster)) {
@@ -362,8 +394,8 @@ public final class SpellEffects {
     /** Version sonorisée de pullAoe, avec anneau au sol. */
     public static void pullAoe(Player caster, double radius, double damage, Particle particle, Sound sound) {
         Location origin = caster.getLocation();
-        caster.getWorld().spawnParticle(particle, origin.clone().add(0, 1, 0), 60, radius / 2, 0.6, radius / 2, 0.02);
-        groundRing(origin, particle, radius, 24);
+        spawn(caster.getWorld(), particle, origin.clone().add(0, 1, 0), 80, radius / 1.6, 0.8, radius / 1.6, 0.025);
+        groundRing(origin, particle, radius, 30);
         caster.getWorld().playSound(origin, sound, 1.2f, 1f);
         for (Entity nearby : caster.getNearbyEntities(radius, radius, radius)) {
             if (nearby instanceof LivingEntity target && !target.equals(caster)) {
@@ -372,5 +404,128 @@ public final class SpellEffects {
                 if (damage > 0) target.damage(damage, caster);
             }
         }
+    }
+
+    // ============================================================
+    //  MÉTÉORES — un vrai objet qui tombe visuellement du ciel jusqu'à
+    //  son point d'impact, au lieu d'une simple explosion posée au sol.
+    // ============================================================
+
+    /**
+     * Un météore qui tombe réellement du ciel jusqu'à `impactPoint` : part en
+     * hauteur au-dessus du point visé, descend à vitesse constante avec une
+     * traînée de particules bien visible, puis explose en zone à l'impact.
+     * C'est la pièce qui manquait aux sorts de météore(s) : avant, seule
+     * l'explosion au sol se déclenchait, sans rien qui ne tombe du ciel.
+     */
+    public static void meteorFall(Plugin plugin, Player caster, Location impactPoint, double startHeight,
+                                   double fallSpeed, double impactRadius, double damage,
+                                   Particle coreParticle, Particle trailParticle, Sound impactSound) {
+        Location groundPoint = impactPoint.clone();
+        groundPoint.getWorld().playSound(groundPoint, Sound.ENTITY_GHAST_SHOOT, 1.4f, 0.6f);
+        groundRing(groundPoint, coreParticle, Math.max(2.0, impactRadius * 0.7), 26);
+
+        new BukkitRunnable() {
+            final Location point = groundPoint.clone().add(0, startHeight, 0);
+
+            @Override
+            public void run() {
+                if (!caster.isOnline()) {
+                    cancel();
+                    return;
+                }
+                if (point.getY() <= groundPoint.getY() + 0.4) {
+                    cancel();
+                    point.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, groundPoint.clone().add(0, 0.2, 0), 2, 0.3, 0, 0.3, 0);
+                    explodeAt(caster, groundPoint, impactRadius, damage, coreParticle, impactSound);
+                    return;
+                }
+                spawn(point.getWorld(), coreParticle, point, 8, 0.22, 0.22, 0.22, 0.012);
+                spawn(point.getWorld(), trailParticle, point, 4, 0.15, 0.15, 0.15, 0.01);
+                point.subtract(0, fallSpeed, 0);
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+    }
+
+    /**
+     * Plusieurs météores (voir meteorFall) qui s'abattent à des instants et
+     * des positions différentes dans une zone, pour un vrai effet de pluie
+     * plutôt qu'une simple zone de dégâts continue sans rien qui ne tombe.
+     */
+    public static void meteorShower(Plugin plugin, Player caster, Location center, int meteorCount,
+                                     double spreadRadius, double startHeight, double fallSpeed,
+                                     double impactRadius, double damagePerMeteor,
+                                     Particle coreParticle, Particle trailParticle, Sound impactSound) {
+        groundRing(center, coreParticle, spreadRadius, 40);
+        for (int i = 0; i < meteorCount; i++) {
+            int index = i;
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (!caster.isOnline()) return;
+                    double angle = Math.random() * 2 * Math.PI;
+                    double dist = Math.random() * spreadRadius;
+                    Location impact = center.clone().add(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+                    meteorFall(plugin, caster, impact, startHeight, fallSpeed, impactRadius, damagePerMeteor,
+                            coreParticle, trailParticle, impactSound);
+                }
+            }.runTaskLater(plugin, (long) (index * 8));
+        }
+    }
+
+    // ============================================================
+    //  VAGUES — un vrai front d'onde qui s'étend tick après tick au lieu
+    //  d'un simple nuage de particules figé sur place. Utilisé par les
+    //  gros sorts d'eau et par la Tempête Primordiale.
+    // ============================================================
+
+    /**
+     * Vague qui s'étend depuis un centre : plusieurs anneaux qui grandissent
+     * progressivement, infligeant des dégâts et un repoussement au moment
+     * précis où le front d'onde atteint chaque cible (une seule fois par
+     * cible, pour ne pas la frapper à chaque tick).
+     */
+    public static void expandingWave(Plugin plugin, Player caster, Location center, double maxRadius,
+                                      int steps, int periodTicks, double damagePerHit, double knockback,
+                                      Particle crestParticle, Particle foamParticle, Sound sound) {
+        center.getWorld().playSound(center, sound, 1.3f, 1f);
+        new BukkitRunnable() {
+            int step = 0;
+            final Set<UUID> alreadyHit = new HashSet<>();
+
+            @Override
+            public void run() {
+                if (step >= steps || !caster.isOnline()) {
+                    cancel();
+                    return;
+                }
+                double radius = maxRadius * (step + 1) / (double) steps;
+                double previousRadius = maxRadius * step / (double) steps;
+                int points = 26 + step * 8;
+                for (int i = 0; i < points; i++) {
+                    double angle = (2 * Math.PI / points) * i;
+                    double x = center.getX() + radius * Math.cos(angle);
+                    double z = center.getZ() + radius * Math.sin(angle);
+                    Location crest = new Location(center.getWorld(), x, center.getY() + 0.2, z);
+                    center.getWorld().spawnParticle(crestParticle, crest, 1, 0, 0.25, 0, 0.04);
+                    if (i % 2 == 0) {
+                        center.getWorld().spawnParticle(foamParticle, crest.clone().add(0, 0.4, 0), 1, 0.1, 0.1, 0.1, 0.01);
+                    }
+                }
+                for (Entity nearby : center.getWorld().getNearbyEntities(center, radius, radius + 1, radius)) {
+                    if (nearby instanceof LivingEntity target && !target.equals(caster) && !alreadyHit.contains(target.getUniqueId())) {
+                        double dist = target.getLocation().distance(center);
+                        if (dist <= radius + 0.5 && dist >= previousRadius - 1.0) {
+                            alreadyHit.add(target.getUniqueId());
+                            target.damage(damagePerHit, caster);
+                            Vector push = target.getLocation().toVector().subtract(center.toVector())
+                                    .normalize().multiply(knockback).setY(0.35);
+                            target.setVelocity(push);
+                        }
+                    }
+                }
+                step++;
+            }
+        }.runTaskTimer(plugin, 0L, periodTicks);
     }
 }
