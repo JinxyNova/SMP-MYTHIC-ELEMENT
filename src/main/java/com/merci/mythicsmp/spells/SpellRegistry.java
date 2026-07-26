@@ -515,14 +515,18 @@ public final class SpellRegistry {
     private void registerVent() {
         add("vent_faible_1", Element.VENT, SpellTier.FAIBLE, "Rafale",
                 "Une rafale de vent qui voyage devant toi et repousse la cible touchée.",
-                (plugin, caster, power) -> SpellEffects.launchProjectile(plugin, caster, 25, 1.6, 0.75,
-                        3.0 * power, 0, Particle.CLOUD, Particle.SWEEP_ATTACK,
-                        Sound.ENTITY_PHANTOM_FLAP, Sound.ENTITY_PLAYER_ATTACK_SWEEP));
+                (plugin, caster, power) -> {
+                    SpellEffects.windBurstCone(caster, Particle.CLOUD, Sound.ENTITY_PHANTOM_FLAP);
+                    SpellEffects.launchProjectile(plugin, caster, 25, 1.6, 0.75,
+                            3.0 * power, 0, Particle.CLOUD, Particle.SWEEP_ATTACK,
+                            Sound.ENTITY_PHANTOM_FLAP, Sound.ENTITY_PLAYER_ATTACK_SWEEP);
+                });
 
         add("vent_faible_2", Element.VENT, SpellTier.FAIBLE, "Bond",
                 "Un puissant saut propulsé par le vent.",
                 (plugin, caster, power) -> {
                     caster.getWorld().playSound(caster.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 1.1f, 1.3f);
+                    SpellEffects.groundRing(caster.getLocation(), Particle.CLOUD, 1.6, 20);
                     SpellEffects.dash(caster, 0.4, 1.2 * power);
                     SpellEffects.dashTrail(plugin, caster, Particle.CLOUD, 19);
                 });
@@ -533,12 +537,15 @@ public final class SpellRegistry {
                     caster.getWorld().playSound(caster.getLocation(), Sound.ITEM_ELYTRA_FLYING, 0.8f, 1.4f);
                     SpellEffects.buff(caster, PotionEffectType.SPEED, amp(power), 150);
                     SpellEffects.dashTrail(plugin, caster, Particle.CLOUD, 31);
+                    SpellEffects.followingAura(plugin, caster, Particle.CLOUD, 150, 0.4, 6);
                 });
 
         add("vent_faible_4", Element.VENT, SpellTier.FAIBLE, "Œil du Vent",
-                "Le vent te renseigne brièvement sur la position des ennemis proches.",
+                "Une onde radar balaie la zone et te renseigne brièvement sur la position des ennemis proches.",
                 (plugin, caster, power) -> {
                     caster.getWorld().playSound(caster.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 1f, 1.5f);
+                    SpellEffects.expandingWave(plugin, caster, caster.getLocation(), 19, 5, 3, 0, 0,
+                            Particle.CLOUD, Particle.CLOUD, Sound.ENTITY_PHANTOM_FLAP);
                     for (Entity nearby : caster.getNearbyEntities(19, 19, 19)) {
                         if (nearby instanceof LivingEntity target && !target.equals(caster)) {
                             SpellEffects.debuff(target, PotionEffectType.GLOWING, 0, (int) (100 * power));
@@ -547,13 +554,16 @@ public final class SpellRegistry {
                 });
 
         add("vent_moyen_1", Element.VENT, SpellTier.MOYEN, "Tornade Miniature",
-                "Une petite tornade attire et endommage les ennemis proches.",
-                (plugin, caster, power) -> SpellEffects.pullAoe(caster, 6.75, 4.0 * power, Particle.CLOUD, Sound.ENTITY_PHANTOM_FLAP));
+                "Une petite tornade tournoyante attire et endommage les ennemis proches.",
+                (plugin, caster, power) -> {
+                    SpellEffects.spinningFunnelAroundCaster(plugin, caster, 3.2, 3.5, 30);
+                    SpellEffects.pullAoe(caster, 6.75, 4.0 * power, Particle.CLOUD, Sound.ENTITY_PHANTOM_FLAP);
+                });
 
         add("vent_moyen_2", Element.VENT, SpellTier.MOYEN, "Bourrasque",
-                "Une bourrasque puissante repousse violemment tout ce qui t'entoure.",
-                (plugin, caster, power) -> SpellEffects.damageKnockbackAoe(caster, 6.75, 3.0 * power, 2.5,
-                        Particle.CLOUD, Particle.SWEEP_ATTACK, Sound.ENTITY_PLAYER_ATTACK_SWEEP));
+                "Un vrai souffle qui s'étend depuis toi et repousse violemment tout ce qu'il traverse.",
+                (plugin, caster, power) -> SpellEffects.expandingWave(plugin, caster, caster.getLocation(), 6.75, 6, 2,
+                        3.0 * power, 2.5, Particle.CLOUD, Particle.SWEEP_ATTACK, Sound.ENTITY_PLAYER_ATTACK_SWEEP));
 
         add("vent_moyen_3", Element.VENT, SpellTier.MOYEN, "Ailes du Vent",
                 "Ralentit ta chute et te rend plus rapide un instant, comme si tu planais.",
@@ -566,13 +576,17 @@ public final class SpellRegistry {
 
         add("vent_moyen_4", Element.VENT, SpellTier.MOYEN, "Lame de Vent",
                 "Une lame d'air tranchante voyage et frappe la première cible touchée.",
-                (plugin, caster, power) -> SpellEffects.launchProjectile(plugin, caster, 32, 1.7, 0.8,
-                        6.0 * power, 0, Particle.SWEEP_ATTACK, Particle.CLOUD,
-                        Sound.ENTITY_PLAYER_ATTACK_SWEEP, Sound.ENTITY_PLAYER_ATTACK_SWEEP));
+                (plugin, caster, power) -> {
+                    SpellEffects.windBurstCone(caster, Particle.SWEEP_ATTACK, Sound.ENTITY_PLAYER_ATTACK_SWEEP);
+                    SpellEffects.launchProjectile(plugin, caster, 32, 1.7, 0.8,
+                            6.0 * power, 0, Particle.SWEEP_ATTACK, Particle.CLOUD,
+                            Sound.ENTITY_PLAYER_ATTACK_SWEEP, Sound.ENTITY_PLAYER_ATTACK_SWEEP);
+                });
 
         add("vent_fort_1", Element.VENT, SpellTier.FORT, "Cyclone",
-                "Un cyclone attire puis endommage continuellement les ennemis proches.",
+                "Un vrai cyclone tournoyant t'entoure, attirant puis endommageant continuellement les ennemis proches.",
                 (plugin, caster, power) -> {
+                    SpellEffects.spinningFunnelAroundCaster(plugin, caster, 5.5, 5.5, 87);
                     SpellEffects.pullAoe(caster, 9.4, 0, Particle.CLOUD, Sound.ENTITY_PHANTOM_FLAP);
                     SpellEffects.areaOverTime(plugin, caster, caster.getLocation(), 7.25, 2.0 * power, 87, 20,
                             Particle.CLOUD, Sound.ENTITY_PHANTOM_FLAP);
@@ -582,24 +596,26 @@ public final class SpellRegistry {
                 "Un déplacement fulgurant qui endommage tout sur ton passage.",
                 (plugin, caster, power) -> {
                     caster.getWorld().playSound(caster.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 1.3f, 1.2f);
+                    SpellEffects.windBurstCone(caster, Particle.CLOUD, Sound.ENTITY_PHANTOM_FLAP);
                     SpellEffects.dash(caster, 2.6 * power, 0.15);
                     SpellEffects.dashTrail(plugin, caster, Particle.CLOUD, 22);
                     SpellEffects.damageAoe(caster, 4.35, 6.0 * power, Particle.CLOUD, Sound.ENTITY_PHANTOM_FLAP);
                 });
 
         add("vent_fort_3", Element.VENT, SpellTier.FORT, "Bouclier Aérien",
-                "Un mur d'air te protège des projectiles et des chocs pendant un moment.",
+                "Un dôme de vent tourbillonnant te protège des projectiles et des chocs pendant un moment.",
                 (plugin, caster, power) -> {
                     caster.getWorld().playSound(caster.getLocation(), Sound.ITEM_ELYTRA_FLYING, 1.1f, 1f);
                     SpellEffects.shield(caster, amp(power) + 1, (int) (215 * power));
-                    SpellEffects.followingAura(plugin, caster, Particle.CLOUD, (int) (215 * power), 1.16, 10);
+                    SpellEffects.followingAura(plugin, caster, Particle.CLOUD, (int) (215 * power), 1.16, 14);
                 });
 
         add("vent_fort_4", Element.VENT, SpellTier.FORT, "Chant des Tempêtes",
-                "Affaiblit et ralentit tous les ennemis dans une large zone.",
+                "Une tempête grondante affaiblit et ralentit tous les ennemis dans une large zone.",
                 (plugin, caster, power) -> {
                     caster.getWorld().playSound(caster.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 1.3f, 0.7f);
-                    SpellEffects.groundRing(caster.getLocation(), Particle.CLOUD, 10.15, 40);
+                    SpellEffects.expandingWave(plugin, caster, caster.getLocation(), 10.15, 5, 3, 0, 0,
+                            Particle.CLOUD, Particle.CLOUD, Sound.ENTITY_PHANTOM_FLAP);
                     for (Entity nearby : caster.getNearbyEntities(10.15, 10.15, 10.15)) {
                         if (nearby instanceof LivingEntity target && !target.equals(caster)) {
                             SpellEffects.debuff(target, PotionEffectType.SLOWNESS, amp(power), (int) (145 * power));
@@ -609,43 +625,43 @@ public final class SpellRegistry {
                 });
 
         add("vent_ultra_1", Element.VENT, SpellTier.ULTRA_FORT, "Tempête Dévastatrice",
-                "Une tempête déchaînée inflige des dégâts continus et repousse tout autour de toi.",
+                "Une tempête déchaînée, zébrée d'éclairs, inflige des dégâts continus et repousse tout autour de toi.",
                 (plugin, caster, power) -> {
                     SpellEffects.damageKnockbackAoe(caster, 9.6, 8.0 * power, 1.9,
                             Particle.CLOUD, Particle.SWEEP_ATTACK, Sound.ENTITY_PLAYER_ATTACK_SWEEP);
                     SpellEffects.areaOverTime(plugin, caster, caster.getLocation(), 9.6, 2.5 * power, 160, 20,
                             Particle.CLOUD, Sound.ENTITY_PHANTOM_FLAP);
+                    SpellEffects.lightningFlair(plugin, caster.getLocation(), 9.6, 160, 15);
                 });
 
         add("vent_ultra_2", Element.VENT, SpellTier.ULTRA_FORT, "Avatar du Vent",
-                "Te transforme temporairement en tourbillon : vitesse et saut extrêmes.",
+                "Te transforme temporairement en tourbillon vivant : vitesse et saut extrêmes.",
                 (plugin, caster, power) -> {
                     int duration = (int) (224 * power);
                     caster.getWorld().playSound(caster.getLocation(), Sound.ITEM_ELYTRA_FLYING, 1.3f, 1.3f);
                     SpellEffects.buff(caster, PotionEffectType.SPEED, amp(power) + 1, duration);
                     SpellEffects.buff(caster, PotionEffectType.JUMP_BOOST, amp(power) + 1, duration);
                     SpellEffects.buff(caster, PotionEffectType.SLOW_FALLING, 0, duration);
-                    SpellEffects.followingAura(plugin, caster, Particle.CLOUD, duration, 1.28, 12);
+                    SpellEffects.followingAura(plugin, caster, Particle.CLOUD, duration, 1.28, 14);
                 });
 
         add("vent_ultra_3", Element.VENT, SpellTier.ULTRA_FORT, "Œil du Cyclone",
-                "Aspire violemment tous les ennemis proches vers toi avant de les frapper.",
-                (plugin, caster, power) -> {
-                    SpellEffects.pullAoe(caster, 12.8, 0, Particle.CLOUD, Sound.ENTITY_PHANTOM_FLAP);
-                    SpellEffects.delayedExplodeAt(plugin, caster, caster.getLocation(), 15, 6.4, 12.0 * power,
-                            Particle.EXPLOSION, Sound.ENTITY_GENERIC_EXPLODE);
-                });
+                "Invoque une véritable tornade qui fonce droit devant toi : elle aspire, endommage et arrache "
+                        + "les blocs meubles sur son passage.",
+                (plugin, caster, power) -> SpellEffects.movingTornado(plugin, caster,
+                        20 + 3.0 * power, 1.05, 3.0 + 0.25 * power, 6.5, 2.6 * power));
 
         add("vent_ultra_4", Element.VENT, SpellTier.ULTRA_FORT, "Souffle des Cieux",
-                "T'octroie une mobilité aérienne exceptionnelle pendant une longue durée.",
+                "T'octroie une mobilité aérienne exceptionnelle pendant une longue durée, porté par un vrai souffle tourbillonnant.",
                 (plugin, caster, power) -> {
                     int duration = (int) (320 * power);
                     caster.getWorld().playSound(caster.getLocation(), Sound.ITEM_ELYTRA_FLYING, 1.3f, 1f);
                     SpellEffects.buff(caster, PotionEffectType.SLOW_FALLING, 0, duration);
                     SpellEffects.buff(caster, PotionEffectType.SPEED, amp(power) + 1, duration);
                     SpellEffects.buff(caster, PotionEffectType.JUMP_BOOST, amp(power) + 1, duration);
+                    SpellEffects.windBurstCone(caster, Particle.CLOUD, Sound.ENTITY_PHANTOM_FLAP);
                     SpellEffects.dash(caster, 0.5, 1.6 * power);
-                    SpellEffects.followingAura(plugin, caster, Particle.CLOUD, duration, 1.44, 12);
+                    SpellEffects.followingAura(plugin, caster, Particle.CLOUD, duration, 1.44, 14);
                 });
     }
 }

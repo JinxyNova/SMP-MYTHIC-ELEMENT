@@ -9,6 +9,7 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -18,7 +19,9 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -527,5 +530,249 @@ public final class SpellEffects {
                 step++;
             }
         }.runTaskTimer(plugin, 0L, periodTicks);
+    }
+
+    // ============================================================
+    //  TORNADE — la vraie mécanique demandée pour "Œil du Cyclone" :
+    //  un entonnoir qui voyage réellement dans la direction figée au
+    //  moment du cast, plutôt qu'un simple effet posé sur place.
+    // ============================================================
+
+    /**
+     * Blocs "meubles" qu'une tornade peut arracher du sol (terre, sable,
+     * gravier, neige, végétation, cultures). Volontairement limité à ça :
+     * pas de pierre/bois, pour ne pas raser une construction du joueur au
+     * passage — seul le terrain naturel meuble est affecté, et l'arrachage
+     * est définitif (le bloc ne repousse pas).
+     */
+    private static boolean isTornadoLiftable(Material type) {
+        switch (type) {
+            case DIRT, GRASS_BLOCK, COARSE_DIRT, ROOTED_DIRT, PODZOL, MYCELIUM,
+                    SAND, RED_SAND, GRAVEL, SNOW, SNOW_BLOCK,
+                    SHORT_GRASS, TALL_GRASS, FERN, LARGE_FERN, DEAD_BUSH,
+                    OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES, JUNGLE_LEAVES, ACACIA_LEAVES,
+                    DARK_OAK_LEAVES, MANGROVE_LEAVES, CHERRY_LEAVES, AZALEA_LEAVES, FLOWERING_AZALEA_LEAVES,
+                    WHEAT, CARROTS, POTATOES, BEETROOTS,
+                    POPPY, DANDELION, CORNFLOWER, ALLIUM, AZURE_BLUET, ORANGE_TULIP,
+                    RED_TULIP, PINK_TULIP, WHITE_TULIP, OXEYE_DAISY, LILY_OF_THE_VALLEY -> {
+                yield true;
+            }
+            default -> {
+                yield false;
+            }
+        }
+    }
+
+    /** Point au sol (sommet du plus haut bloc solide) sous une position donnée, pour suivre le relief. */
+    private static Location highestSolidGround(Location near) {
+        Location loc = near.clone();
+        int y = loc.getWorld().getHighestBlockYAt(loc.getBlockX(), loc.getBlockZ());
+        loc.setY(y + 1);
+        return loc;
+    }
+
+    /**
+     * LA vraie tornade : part de la position du joueur et avance en ligne
+     * droite dans la direction où il regardait au moment du cast (direction
+     * figée une fois pour toutes, elle ne suit pas la caméra ensuite). Elle
+     * suit le relief du terrain, tourne sur elle-même en avançant (entonnoir
+     * à plusieurs anneaux, plus large en haut), aspire et endommage les
+     * ennemis qu'elle traverse, ET arrache réellement les blocs meubles
+     * autour d'elle (voir isTornadoLiftable) en les transformant en débris
+     * qui tourbillonnent puis disparaissent — les blocs arrachés ne
+     * repoussent pas, un vrai passage de tornade laisse des marques dans
+     * le terrain.
+     */
+    public static void movingTornado(Plugin plugin, Player caster, double travelDistance, double speed,
+                                      double funnelRadius, double funnelHeight, double damagePerTick) {
+        Vector direction = caster.getLocation().getDirection().setY(0);
+        if (direction.lengthSquared() < 0.0001) direction = new Vector(0, 0, 1);
+        direction.normalize();
+        final Vector dir = direction;
+
+        Location start = caster.getLocation();
+        start.getWorld().playSound(start, Sound.ENTITY_PHANTOM_FLAP, 2f, 0.6f);
+        start.getWorld().playSound(start, Sound.ENTITY_ENDER_DRAGON_FLAP, 1.2f, 1.6f);
+
+        new BukkitRunnable() {
+            final Location center = start.clone();
+            final Map<UUID, Integer> lastHitTick = new HashMap<>();
+            double travelled = 0;
+            int tick = 0;
+
+            @Override
+            public void run() {
+                if (!caster.isOnline() || travelled >= travelDistance) {
+                    Location end = highestSolidGround(center);
+                    spawn(end.getWorld(), Particle.CLOUD, end.clone().add(0, funnelHeight / 2, 0), 130,
+                            funnelRadius, funnelHeight / 2, funnelRadius, 0.07);
+                    end.getWorld().playSound(end, Sound.ENTITY_PHANTOM_FLAP, 1.6f, 1.5f);
+                    cancel();
+                    return;
+                }
+
+                center.add(dir.clone().multiply(speed));
+                travelled += speed;
+                Location groundBase = highestSolidGround(center);
+
+                // --- Entonnoir : anneaux qui s'élargissent avec la hauteur et tournent en avançant ---
+                int rings = 7;
+                for (int r = 0; r < rings; r++) {
+                    double t = r / (double) (rings - 1);
+                    double y = t * funnelHeight;
+                    double ringRadius = funnelRadius * (0.35 + 0.65 * t);
+                    double angle = tick * 0.55 + r * 0.9;
+                    int points = 10 + r * 2;
+                    for (int i = 0; i < points; i++) {
+                        double a = angle + (2 * Math.PI / points) * i;
+                        double x = Math.cos(a) * ringRadius;
+                        double z = Math.sin(a) * ringRadius;
+                        Location p = groundBase.clone().add(x, y, z);
+                        spawn(p.getWorld(), Particle.CLOUD, p, 1, 0, 0, 0, 0);
+                        if (i % 3 == 0) {
+                            spawn(p.getWorld(), Particle.BLOCK_CRUMBLE, p, 1, 0, 0, 0, 0);
+                        }
+                    }
+                }
+
+                if (tick % 8 == 0) {
+                    groundBase.getWorld().playSound(groundBase, Sound.ENTITY_PHANTOM_FLAP, 1.4f, 0.8f);
+                }
+
+                // --- Arrache des blocs meubles autour de la base et les fait tourbillonner ---
+                if (tick % 2 == 0) {
+                    int lifted = 0;
+                    for (int i = 0; i < 6 && lifted < 3; i++) {
+                        double angle = Math.random() * 2 * Math.PI;
+                        double dist = Math.random() * funnelRadius;
+                        int bx = (int) Math.floor(groundBase.getX() + Math.cos(angle) * dist);
+                        int bz = (int) Math.floor(groundBase.getZ() + Math.sin(angle) * dist);
+                        int topY = groundBase.getWorld().getHighestBlockYAt(bx, bz);
+                        for (int dy = 0; dy >= -2; dy--) {
+                            var block = groundBase.getWorld().getBlockAt(bx, topY + dy, bz);
+                            if (isTornadoLiftable(block.getType())) {
+                                var data = block.getBlockData();
+                                block.setType(Material.AIR);
+                                FallingBlock falling = block.getWorld().spawnFallingBlock(
+                                        block.getLocation().add(0.5, 0.3, 0.5), data);
+                                falling.setDropItem(false);
+                                falling.setHurtEntities(false);
+                                Vector spin = new Vector(Math.cos(angle) * 0.3,
+                                        0.55 + Math.random() * 0.3, Math.sin(angle) * 0.3);
+                                falling.setVelocity(spin);
+                                new BukkitRunnable() {
+                                    @Override
+                                    public void run() {
+                                        if (!falling.isDead()) falling.remove();
+                                    }
+                                }.runTaskLater(plugin, 30L);
+                                lifted++;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // --- Aspire, soulève et endommage les entités prises dans l'entonnoir ---
+                for (Entity nearby : groundBase.getWorld().getNearbyEntities(
+                        groundBase.clone().add(0, funnelHeight / 2, 0), funnelRadius + 1.5, funnelHeight, funnelRadius + 1.5)) {
+                    if (nearby instanceof LivingEntity target && !target.equals(caster)) {
+                        Vector toCenter = groundBase.toVector().subtract(target.getLocation().toVector());
+                        toCenter.setY(0);
+                        if (toCenter.lengthSquared() > 0.01) toCenter.normalize();
+                        target.setVelocity(toCenter.multiply(0.45).setY(0.32));
+
+                        Integer last = lastHitTick.get(target.getUniqueId());
+                        if (last == null || tick - last >= 10) {
+                            target.damage(damagePerTick, caster);
+                            lastHitTick.put(target.getUniqueId(), tick);
+                        }
+                    }
+                }
+
+                tick++;
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+    }
+
+    /**
+     * Colonne tournante immobile centrée sur le joueur (contrairement à
+     * movingTornado, elle ne se déplace pas) : anneaux à hauteurs
+     * croissantes qui tournent en continu pendant `durationTicks`. Purement
+     * visuel, à combiner avec pullAoe/areaOverTime pour les mécaniques —
+     * utilisé pour donner une vraie silhouette de tornade aux sorts de
+     * cyclone stationnaires (Tornade Miniature, Cyclone...).
+     */
+    public static void spinningFunnelAroundCaster(Plugin plugin, Player caster, double radius, double height, int durationTicks) {
+        new BukkitRunnable() {
+            int elapsed = 0;
+
+            @Override
+            public void run() {
+                if (elapsed >= durationTicks || !caster.isOnline()) {
+                    cancel();
+                    return;
+                }
+                Location origin = caster.getLocation();
+                int rings = 5;
+                for (int r = 0; r < rings; r++) {
+                    double t = r / (double) (rings - 1);
+                    double y = t * height;
+                    double ringRadius = radius * (0.4 + 0.6 * t);
+                    double angle = elapsed * 0.45 + r * 1.1;
+                    int points = 8 + r * 2;
+                    for (int i = 0; i < points; i++) {
+                        double a = angle + (2 * Math.PI / points) * i;
+                        double x = Math.cos(a) * ringRadius;
+                        double z = Math.sin(a) * ringRadius;
+                        Location p = origin.clone().add(x, y, z);
+                        spawn(p.getWorld(), Particle.CLOUD, p, 1, 0, 0, 0, 0);
+                    }
+                }
+                elapsed += 2;
+            }
+        }.runTaskTimer(plugin, 0L, 2L);
+    }
+
+    /**
+     * Éclats de "foudre" purement visuels (colonne de particules de vent +
+     * son de grondement à intervalles aléatoires) pour donner de la
+     * spectacle à un sort de tempête sans les complications d'une vraie
+     * foudre vanilla (feu, dégâts en plus). N'inflige aucun dégât.
+     */
+    public static void lightningFlair(Plugin plugin, Location center, double radius, int durationTicks, int periodTicks) {
+        new BukkitRunnable() {
+            int elapsed = 0;
+
+            @Override
+            public void run() {
+                if (elapsed >= durationTicks) {
+                    cancel();
+                    return;
+                }
+                double angle = Math.random() * 2 * Math.PI;
+                double dist = Math.random() * radius;
+                Location strike = center.clone().add(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+                Location ground = highestSolidGround(strike);
+                for (double y = 0; y < 6; y += 0.4) {
+                    spawn(ground.getWorld(), Particle.CLOUD, ground.clone().add(0, y, 0), 2, 0.05, 0, 0.05, 0.01);
+                }
+                ground.getWorld().playSound(ground, Sound.ENTITY_PHANTOM_FLAP, 1.6f, 0.5f);
+                elapsed += periodTicks;
+            }
+        }.runTaskTimer(plugin, 0L, periodTicks);
+    }
+
+    /** Petit cône de particules jeté devant le joueur au moment du cast, pour ponctuer un lancer de projectile. */
+    public static void windBurstCone(Player caster, Particle particle, Sound sound) {
+        Location eye = caster.getEyeLocation();
+        Vector dir = eye.getDirection().normalize();
+        caster.getWorld().playSound(eye, sound, 1.1f, 1.3f);
+        for (int i = 0; i < 18; i++) {
+            double spread = (Math.random() - 0.5) * 0.9;
+            Vector v = dir.clone().add(new Vector(spread, spread * 0.5, spread)).normalize().multiply(0.6 + Math.random() * 0.5);
+            Location p = eye.clone().add(v);
+            spawn(p.getWorld(), particle, p, 2, 0.05, 0.05, 0.05, 0.02);
+        }
     }
 }
