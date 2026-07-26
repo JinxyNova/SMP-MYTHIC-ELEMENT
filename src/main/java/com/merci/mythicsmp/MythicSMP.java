@@ -31,6 +31,7 @@ import com.merci.mythicsmp.listeners.ElementFirstJoinListener;
 import com.merci.mythicsmp.listeners.ElementMenuListener;
 import com.merci.mythicsmp.listeners.ForgeListener;
 import com.merci.mythicsmp.listeners.GemFusionListener;
+import com.merci.mythicsmp.listeners.GrimoireListener;
 import com.merci.mythicsmp.listeners.InfinitePowerGemListener;
 import com.merci.mythicsmp.listeners.JobListener;
 import com.merci.mythicsmp.listeners.PassiveEquipmentTask;
@@ -48,6 +49,8 @@ import com.merci.mythicsmp.listeners.WeaponEffectListener;
 import com.merci.mythicsmp.listeners.WitherEyeListener;
 import com.merci.mythicsmp.quests.QuestManager;
 import com.merci.mythicsmp.scoreboard.ScoreboardManager;
+import com.merci.mythicsmp.spells.GrimoireGuiManager;
+import com.merci.mythicsmp.spells.GrimoireManager;
 import com.merci.mythicsmp.spells.SpellManager;
 import com.merci.mythicsmp.spells.SpellRegistry;
 import com.merci.mythicsmp.spells.SpellWheelManager;
@@ -68,6 +71,7 @@ public final class MythicSMP extends JavaPlugin {
     private JobManager jobManager;
     private ElementManager elementManager;
     private SpellManager spellManager;
+    private GrimoireManager grimoireManager;
     private UltimateMageManager ultimateMageManager;
 
     @Override
@@ -90,6 +94,10 @@ public final class MythicSMP extends JavaPlugin {
         pluginManager.registerEvents(new SpellWheelListener(this, spellManager, spellWheelManager), this);
         pluginManager.registerEvents(new SpellRuneListener(this, itemRegistry, elementManager, spellWheelManager), this);
         getCommand("mythicspells").setExecutor(new MythicSpellsCommand(elementManager, spellWheelManager, spellManager));
+
+        this.grimoireManager = new GrimoireManager(this);
+        GrimoireGuiManager grimoireGuiManager = new GrimoireGuiManager(this, grimoireManager, spellManager);
+        pluginManager.registerEvents(new GrimoireListener(this, grimoireManager, spellManager, grimoireGuiManager), this);
 
         this.ultimateMageManager = new UltimateMageManager(this);
         UltimateSpellMenuManager ultimateSpellMenuManager = new UltimateSpellMenuManager(this, ultimateMageManager);
@@ -149,6 +157,7 @@ public final class MythicSMP extends JavaPlugin {
         if (jobManager != null) jobManager.save();
         if (elementManager != null) elementManager.save();
         if (spellManager != null) spellManager.save();
+        if (grimoireManager != null) grimoireManager.save();
         if (ultimateMageManager != null) ultimateMageManager.save();
         getLogger().info("MythicSMP désactivé.");
     }

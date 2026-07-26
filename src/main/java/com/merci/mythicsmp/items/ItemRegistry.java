@@ -3,6 +3,7 @@ package com.merci.mythicsmp.items;
 import com.merci.mythicsmp.elements.Element;
 import com.merci.mythicsmp.items.mythic.AdminHeadItem;
 import com.merci.mythicsmp.items.mythic.ElementalGemItem;
+import com.merci.mythicsmp.items.mythic.GrimoireItem;
 import com.merci.mythicsmp.items.mythic.InfinitePowerGemItem;
 import com.merci.mythicsmp.items.mythic.PhoenixHeartItem;
 import com.merci.mythicsmp.items.mythic.SpellRuneItem;
@@ -47,6 +48,7 @@ public class ItemRegistry {
         register(new PhoenixHeartItem(plugin));
         register(new InfinitePowerGemItem(plugin));
         register(new UltimateMageGemItem(plugin));
+        register(new GrimoireItem(plugin));
         for (Element element : Element.values()) {
             for (SpellTier tier : SpellTier.values()) {
                 register(new SpellRuneItem(plugin, element, tier));

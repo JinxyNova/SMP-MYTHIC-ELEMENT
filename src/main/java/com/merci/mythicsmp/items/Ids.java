@@ -40,4 +40,7 @@ public final class Ids {
     public static final String COURONNE_ROI = "couronne_roi";
     public static final String LANTERNE_AME = "lanterne_ame";
     public static final String ELYTRES_VENT = "elytres_vent";
+
+    // Sorts (voir package spells / GrimoireItem)
+    public static final String GRIMOIRE = "grimoire";
 }
