@@ -546,7 +546,7 @@ public final class SpellEffects {
      * est définitif (le bloc ne repousse pas).
      */
     private static boolean isTornadoLiftable(Material type) {
-        switch (type) {
+        return switch (type) {
             case DIRT, GRASS_BLOCK, COARSE_DIRT, ROOTED_DIRT, PODZOL, MYCELIUM,
                     SAND, RED_SAND, GRAVEL, SNOW, SNOW_BLOCK,
                     SHORT_GRASS, TALL_GRASS, FERN, LARGE_FERN, DEAD_BUSH,
@@ -554,13 +554,9 @@ public final class SpellEffects {
                     DARK_OAK_LEAVES, MANGROVE_LEAVES, CHERRY_LEAVES, AZALEA_LEAVES, FLOWERING_AZALEA_LEAVES,
                     WHEAT, CARROTS, POTATOES, BEETROOTS,
                     POPPY, DANDELION, CORNFLOWER, ALLIUM, AZURE_BLUET, ORANGE_TULIP,
-                    RED_TULIP, PINK_TULIP, WHITE_TULIP, OXEYE_DAISY, LILY_OF_THE_VALLEY -> {
-                yield true;
-            }
-            default -> {
-                yield false;
-            }
-        }
+                    RED_TULIP, PINK_TULIP, WHITE_TULIP, OXEYE_DAISY, LILY_OF_THE_VALLEY -> true;
+            default -> false;
+        };
     }
 
     /** Point au sol (sommet du plus haut bloc solide) sous une position donnée, pour suivre le relief. */
